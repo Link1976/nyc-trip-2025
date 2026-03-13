@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>NYC Trip Grupo 2025</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --yellow: #F7E733;
+    --black: #0A0A0A;
+    --white: #F5F4EE;
+    --gray: #1C1C1C;
+    --mid: #2E2E2E;
+    --accent: #FF4D1C;
+    --green: #3DDC84;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    padding-bottom: var(--safe-bottom);
+  }
+
+  header {
+    background: var(--yellow);
+    color: var(--black);
+    padding: 10px 20px;
+    padding-top: calc(10px + var(--safe-top));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 3px solid var(--black);
+  }
+
+  .logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.7rem; letter-spacing: 2px; line-height: 1; }
+  .logo .dot { color: var(--accent); }
+  .logo .sub { font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 300; opacity: 0.6; margin-left: 4px; }
+  .header-meta { font-size: 0.72rem; text-align: right; opacity: 0.6; }
+  .sync-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .sync-dot.online { background: #3DDC84; }
+  .sync-dot.offline { background: #E67E22; }
+
+  .tabs {
+    display: flex;
+    background: var(--gray);
+    border-bottom: 2px solid var(--mid);
+    padding: 0 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab-btn {
+    background: none; border: none; color: #666;
+    font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 500;
+    padding: 13px 16px; cursor: pointer; white-space: nowrap;
+    border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color 0.2s;
+  }
+  .tab-btn.active { color: var(--yellow); border-bottom-color: var(--yellow); }
+
+  .main { padding: 16px; max-width: 900px; margin: 0 auto; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  @media (max-width: 768px) {
+    .tabs {
+      position: fixed;
+      bottom: 0; left: 0; right: 0; top: auto;
+      border-bottom: none;
+      border-top: 2px solid var(--mid);
+      padding: 0;
+      padding-bottom: var(--safe-bottom);
+      z-index: 100;
+      justify-content: space-around;
+    }
+    .tab-btn {
+      flex: 1; text-align: center;
+      padding: 12px 4px;
+      border-bottom: none;
+      border-top: 3px solid transparent;
+      margin-bottom: 0; margin-top: -2px;
+      font-size: 0.72rem;
+    }
+    .tab-btn.active { border-bottom: none; border-top-color: var(--yellow); }
+    .main { padding-bottom: calc(70px + var(--safe-bottom)); }
+  }
+
+  .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 16px; }
+  .stat-card { background: var(--gray); border: 1px solid var(--mid); border-radius: 10px; padding: 12px 8px; text-align: center; }
+  .stat-num { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--yellow); line-height: 1; }
+  .stat-label { font-size: 0.65rem; color: #555; margin-top: 3px; text-transform: uppercase; }
+
+  .card { background: var(--gray); border: 1px solid var(--mid); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+  .card-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--yellow); margin-bottom: 12px; }
+
+  .form-row { display: grid; gap: 8px; margin-bottom: 8px; }
+  .cols3 { grid-template-columns: 2fr 1fr 1fr; }
+  .cols2 { grid-template-columns: 1fr 1fr; }
+
+  input, select, textarea {
+    background: var(--mid); border: 1px solid #3a3a3a; border-radius: 7px;
+    color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 0.88rem;
+    padding: 10px 12px; width: 100%; -webkit-appearance: none;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--yellow); }
+  select option { background: var(--mid); }
+
+  .btn {
+    display: block; width: 100%; background: var(--yellow); color: var(--black);
+    border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif;
+    font-weight: 700; font-size: 0.88rem; padding: 12px 20px; cursor: pointer; margin-top: 8px;
+  }
+  .btn-red { background: var(--accent); color: white; }
+  .btn-outline { background: transparent; border: 2px solid var(--yellow); color: var(--yellow); }
+  .btn-inline { display: inline-block; width: auto; padding: 9px 16px; margin-top: 0; font-size: 0.82rem; }
+  .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+  .btn-row .btn { margin-top: 0; flex: 1; }
+  .btn-row .btn-outline { flex: 0; }
+
+  .filters { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  .filter-btn {
+    background: var(--mid); border: 1px solid #3a3a3a; color: #888;
+    border-radius: 20px; padding: 5px 13px; font-size: 0.78rem; cursor: pointer;
+    white-space: nowrap; font-family: 'DM Sans', sans-serif;
+  }
+  .filter-btn.active { background: var(--yellow); color: var(--black); border-color: var(--yellow); font-weight: 700; }
+
+  .places-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+
+  .place-addr { font-size: 0.72rem; color: #555; margin-top: 2px; font-style: italic; }
+  .maps-link { display: inline-block; background: #1A73E8; color: white; font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 5px; text-decoration: none; margin-top: 8px; margin-right: 6px; font-family: 'DM Sans', sans-serif; }
+  .maps-link:hover { background: #1557B0; }
+  .maps-route { display: block; background: #1A73E8; color: white; font-size: 0.82rem; font-weight: 700; padding: 10px 16px; border-radius: 8px; text-decoration: none; text-align: center; margin-top: 10px; font-family: 'DM Sans', sans-serif; }
+  .maps-route:hover { background: #1557B0; }
+  .day-block li .maps-link { margin-top: 4px; }
+
+  .place-card { background: var(--gray); border: 1px solid var(--mid); border-radius: 10px; padding: 14px; position: relative; }
+  .zone-badge { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 2px 7px; border-radius: 4px; display: inline-block; color: white; }
+  .z-manhattan { background: #4A90E2; } .z-brooklyn { background: #9B59B6; }
+  .z-queens { background: #27AE60; } .z-bronx { background: #E67E22; } .z-staten { background: #E74C3C; }
+  .cat-badge { font-size: 0.65rem; background: var(--mid); border: 1px solid #444; color: #888; padding: 2px 7px; border-radius: 4px; margin-left: 5px; }
+  .place-name { font-weight: 600; font-size: 0.95rem; margin: 8px 0 4px; padding-right: 24px; }
+  .place-notes { font-size: 0.8rem; color: #777; line-height: 1.5; }
+  .place-who { font-size: 0.72rem; color: #444; margin-top: 8px; }
+  .del-btn { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #333; cursor: pointer; font-size: 1rem; padding: 4px; }
+  .vote-btn { background: none; border: 1px solid #3a3a3a; border-radius: 6px; color: #555; cursor: pointer; font-size: 0.78rem; padding: 5px 10px; margin-top: 10px; font-family: 'DM Sans', sans-serif; }
+  .vote-btn.voted { border-color: var(--green); color: var(--green); }
+
+  .import-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  textarea.import-area { min-height: 160px; resize: vertical; }
+  .progress-bar { height: 3px; background: var(--mid); border-radius: 2px; margin: 10px 0; overflow: hidden; display: none; }
+  .progress-fill { height: 100%; background: var(--yellow); border-radius: 2px; width: 0; transition: width 0.4s; }
+
+  .extracted-list { max-height: 300px; overflow-y: auto; }
+  .ext-item { border-radius: 7px; padding: 10px 12px; margin-bottom: 7px; border: 1px solid; }
+  .ext-new { border-color: var(--green); background: rgba(61,220,132,0.04); }
+  .ext-dup { border-color: #E67E22; background: rgba(230,126,34,0.04); opacity: 0.65; }
+  .ext-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; }
+  .ext-badge { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; margin-left: 7px; vertical-align: middle; }
+  .badge-new { background: var(--green); color: #0A0A0A; }
+  .badge-dup { background: #E67E22; color: white; }
+  .import-summary { font-size: 0.8rem; color: #888; background: var(--black); padding: 8px 12px; border-radius: 7px; border: 1px solid var(--mid); margin-top: 10px; }
+
+  .itin-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+  .itin-group { display: flex; flex-direction: column; gap: 4px; }
+  .itin-group label { font-size: 0.7rem; color: #666; text-transform: uppercase; }
+  .itin-group input, .itin-group select { width: auto; }
+
+  .day-block { background: var(--gray); border-left: 4px solid var(--yellow); border-radius: 0 10px 10px 0; padding: 14px 16px; margin-bottom: 12px; }
+  .day-block h3 { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 2px; color: var(--yellow); margin-bottom: 8px; }
+  .day-block ul { list-style: none; padding: 0; }
+  .day-block li { padding: 5px 0; border-bottom: 1px solid var(--mid); font-size: 0.85rem; color: #bbb; }
+  .day-block li:last-child { border: none; }
+
+  .zone-block { background: var(--gray); border-left: 4px solid #555; border-radius: 0 10px 10px 0; padding: 14px 16px; margin-bottom: 12px; }
+  .zone-block h3 { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+  .zone-block ul { list-style: none; padding: 0; }
+  .zone-block li { padding: 5px 0; border-bottom: 1px solid var(--mid); font-size: 0.85rem; }
+  .zone-block li:last-child { border: none; }
+
+  .toast {
+    position: fixed;
+    bottom: calc(20px + var(--safe-bottom));
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--green); color: var(--black);
+    padding: 10px 22px; border-radius: 20px; font-weight: 700; font-size: 0.85rem;
+    opacity: 0; transition: all 0.3s; z-index: 999; white-space: nowrap; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .empty { text-align: center; padding: 40px 0; color: #333; font-size: 0.88rem; }
+
+  .search-box { display: flex; gap: 8px; margin-bottom: 6px; }
+  .search-box input { flex: 1; }
+  .search-box .btn { margin-top: 0; width: auto; min-width: 90px; flex-shrink: 0; }
+  .search-hint { font-size: 0.72rem; color: #444; margin-bottom: 8px; line-height: 1.5; }
+  .search-progress { height: 3px; background: var(--mid); border-radius: 2px; margin: 8px 0; overflow: hidden; display: none; }
+
+  .search-result-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 360px; overflow-y: auto; }
+  .search-result-item {
+    background: var(--mid); border: 1px solid #3a3a3a; border-radius: 8px;
+    padding: 12px; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+  }
+  .search-result-item:hover, .search-result-item:active { border-color: var(--yellow); background: #333; }
+  .search-result-item.is-dup { opacity: 0.5; cursor: default; }
+  .search-result-item.is-dup:hover { border-color: #E67E22; background: var(--mid); }
+  .sr-name { font-weight: 600; font-size: 0.92rem; margin-bottom: 3px; }
+  .sr-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+  .sr-desc { font-size: 0.78rem; color: #777; line-height: 1.4; }
+  .sr-dup-tag { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; background: #E67E22; color: white; padding: 2px 6px; border-radius: 4px; }
+
+  .selected-place-card {
+    background: var(--mid); border: 2px solid var(--green); border-radius: 10px;
+    padding: 14px; margin-bottom: 10px;
+  }
+  .sp-name { font-weight: 700; font-size: 1rem; color: var(--green); margin-bottom: 4px; }
+  .sp-details { font-size: 0.8rem; color: #999; line-height: 1.5; }
+
+  @media (min-width: 600px) {
+    .places-grid { grid-template-columns: repeat(2,1fr); }
+    .import-grid { grid-template-columns: 1fr 1fr; }
+    .cols3 { grid-template-columns: 2fr 1fr 1fr; }
+  }
+  @media (max-width: 599px) {
+    .cols3, .cols2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">NYC<span class="dot">.</span>Trip<span class="sub">2025</span></div>
+  <div class="header-meta"><span id="sync-status"></span>8 adultos &middot; 8 ninos</div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('places',this)">Sitios</button>
+  <button class="tab-btn" onclick="switchTab('import',this)">Importar</button>
+  <button class="tab-btn" onclick="switchTab('itinerary',this)">Itinerario IA</button>
+  <button class="tab-btn" onclick="switchTab('zones',this)">Zonas</button>
+</div>
+
+<div class="main">
+
+  <!-- PLACES -->
+  <div id="tab-places" class="tab-panel active">
+    <div class="stats-row" id="stats-row"></div>
+
+    <div class="card">
+      <div class="card-title">Buscar sitio en NYC</div>
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Busca restaurantes, museos, tiendas..." autocomplete="off" />
+        <button class="btn btn-red" id="search-btn" onclick="searchPlaces()">Buscar</button>
+      </div>
+      <p class="search-hint">Escribe lo que buscas y la IA encontrara sitios reales de Nueva York</p>
+      <div class="search-progress" id="search-progress"><div class="progress-fill" id="search-fill"></div></div>
+      <div id="search-results"></div>
+      <div id="search-confirm" style="display:none">
+        <div class="selected-place-card" id="selected-place-info"></div>
+        <div class="form-row cols2">
+          <input type="text" id="inp-notes" placeholder="Notas (opcional)..." />
+          <input type="text" id="inp-who" placeholder="Propuesto por..." />
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="confirmSearchAdd()">Anadir a la lista</button>
+          <button class="btn btn-outline btn-inline" onclick="cancelSearchAdd()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="filters">
+      <button class="filter-btn active" onclick="setFilter('all',this)">Todos</button>
+      <button class="filter-btn" onclick="setFilter('manhattan',this)">Manhattan</button>
+      <button class="filter-btn" onclick="setFilter('brooklyn',this)">Brooklyn</button>
+      <button class="filter-btn" onclick="setFilter('queens',this)">Queens</button>
+      <button class="filter-btn" onclick="setFilter('bronx',this)">Bronx</button>
+      <button class="filter-btn" onclick="setFilter('staten',this)">Staten I.</button>
+    </div>
+
+    <div class="places-grid" id="places-grid"></div>
+  </div>
+
+  <!-- IMPORT -->
+  <div id="tab-import" class="tab-panel">
+    <div class="import-grid">
+      <div class="card">
+        <div class="card-title">Pega texto del grupo</div>
+        <textarea class="import-area" id="import-text" placeholder="Pega mensajes de WhatsApp, emails, notas..."></textarea>
+        <p style="font-size:0.75rem;color:#555;margin-top:8px;line-height:1.6">La IA extrae los sitios, infiere zona y categoria, y detecta duplicados automaticamente.</p>
+        <div class="progress-bar" id="extract-progress"><div class="progress-fill" id="extract-fill"></div></div>
+        <div class="btn-row">
+          <button class="btn btn-red" id="extract-btn" onclick="extractFromText()">Analizar con IA</button>
+          <button class="btn btn-outline btn-inline" onclick="clearImport()">Limpiar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Sitios detectados</div>
+        <div id="extracted-results">
+          <div class="empty">Los sitios detectados apareceran aqui.<br><br><span style="color:var(--green)">Verde = nuevo</span><br><span style="color:#E67E22">Naranja = ya existe</span></div>
+        </div>
+        <div id="import-summary" class="import-summary" style="display:none"></div>
+        <div id="import-actions" style="display:none" class="btn-row">
+          <button class="btn" id="confirm-btn" onclick="confirmImport()">Confirmar</button>
+          <button class="btn btn-outline btn-inline" onclick="clearExtracted()">Descartar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ITINERARY -->
+  <div id="tab-itinerary" class="tab-panel">
+    <div class="card">
+      <div class="card-title">Configurar itinerario</div>
+      <div class="itin-controls">
+        <div class="itin-group">
+          <label>Dias</label>
+          <input type="number" id="cfg-days" value="5" min="1" max="14" style="width:65px" />
+        </div>
+        <div class="itin-group">
+          <label>Ritmo</label>
+          <select id="cfg-pace">
+            <option value="relajado">Relajado</option>
+            <option value="normal" selected>Normal</option>
+            <option value="intenso">Intenso</option>
+          </select>
+        </div>
+        <div class="itin-group">
+          <label>Prioridad</label>
+          <select id="cfg-prio">
+            <option value="votos">Por votos</option>
+            <option value="ninos">Apto ninos</option>
+            <option value="zona">Por zona</option>
+          </select>
+        </div>
+        <div class="itin-group">
+          <label>Fecha inicio</label>
+          <input type="date" id="cfg-date" />
+        </div>
+      </div>
+      <button class="btn btn-red" id="gen-btn" onclick="generateItinerary()">Generar con IA</button>
+    </div>
+    <div id="itin-output"></div>
+  </div>
+
+  <!-- ZONES -->
+  <div id="tab-zones" class="tab-panel">
+    <div id="zones-view"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var SK = 'nyc_trip_v3';
+var VK = 'nyc_voted_v3';
+var ZL = { manhattan:'Manhattan', brooklyn:'Brooklyn', queens:'Queens', bronx:'El Bronx', staten:'Staten Island' };
+var ZC = { manhattan:'#4A90E2', brooklyn:'#9B59B6', queens:'#27AE60', bronx:'#E67E22', staten:'#E74C3C' };
+var VZ = ['manhattan','brooklyn','queens','bronx','staten'];
+var VC = ['museo','parque','restaurante','compras','cultura','actividad','foto','transporte','otro'];
+var SEED = [
+  {id:1,name:'Central Park',zone:'manhattan',cat:'parque',notes:'Perfecto para ninos, bici o a pie',who:'Maria',votes:3},
+  {id:2,name:'Top of the Rock',zone:'manhattan',cat:'foto',notes:'Mejores vistas, menos cola que Empire State',who:'Carlos',votes:5},
+  {id:3,name:'DUMBO Brooklyn Bridge',zone:'brooklyn',cat:'foto',notes:'Cruzar el puente a pie',who:'Laura',votes:4},
+  {id:4,name:'Intrepid Museum',zone:'manhattan',cat:'museo',notes:'Portaaviones y transbordador espacial',who:'Javi',votes:6},
+  {id:5,name:'High Line',zone:'manhattan',cat:'parque',notes:'Parque elevado sobre antigua via de tren',who:'Ana',votes:2},
+  {id:6,name:'Katz Delicatessen',zone:'manhattan',cat:'restaurante',notes:'El pastrami mas famoso de NYC',who:'Pedro',votes:3},
+  {id:7,name:'Coney Island',zone:'brooklyn',cat:'actividad',notes:'Playa mas parque de atracciones vintage',who:'Sara',votes:4},
+  {id:8,name:'Natural History Museum',zone:'manhattan',cat:'museo',notes:'Dinosaurios y ballena azul',who:'Miguel',votes:7}
+];
+
+var places = [];
+var voted = [];
+var filter = 'all';
+var extracted = [];
+
+var NYC_DB = {
+  'central park': {addr:'Central Park, New York, NY',lat:40.7829,lng:-73.9654,cat:'parque',zone:'manhattan',desc:'El parque mas famoso de NYC, bici, paseo, zoo',tags:'parque jardin naturaleza ninos paseo bici zoo infantil'},
+  'top of the rock': {addr:'30 Rockefeller Plaza, New York, NY 10112',lat:40.7593,lng:-73.9794,cat:'foto',zone:'manhattan',desc:'Mirador con las mejores vistas del skyline',tags:'mirador vistas observatorio foto panoramica rockefeller'},
+  'dumbo brooklyn bridge': {addr:'Brooklyn Bridge, New York, NY',lat:40.7061,lng:-73.9969,cat:'foto',zone:'brooklyn',desc:'Cruzar el puente a pie, vistas iconicas',tags:'puente foto vistas paseo caminar brooklyn'},
+  'intrepid museum': {addr:'Pier 86, W 46th St, New York, NY 10036',lat:40.7645,lng:-73.9997,cat:'museo',zone:'manhattan',desc:'Portaaviones museo con aviones y transbordador espacial',tags:'museo barco avion militar espacio ninos ciencia'},
+  'high line': {addr:'High Line, New York, NY 10011',lat:40.7480,lng:-74.0048,cat:'parque',zone:'manhattan',desc:'Parque elevado sobre antigua via de tren',tags:'parque paseo elevado tren arte urbano chelsea'},
+  'katz delicatessen': {addr:'205 E Houston St, New York, NY 10002',lat:40.7223,lng:-73.9874,cat:'restaurante',zone:'manhattan',desc:'El pastrami mas famoso de NYC desde 1888',tags:'restaurante comida pastrami sandwich deli historico'},
+  'coney island': {addr:'Coney Island, Brooklyn, NY',lat:40.5749,lng:-73.9859,cat:'actividad',zone:'brooklyn',desc:'Playa y parque de atracciones vintage',tags:'playa atracciones ninos montanarusa feria verano luna park'},
+  'natural history museum': {addr:'200 Central Park West, New York, NY 10024',lat:40.7813,lng:-73.9740,cat:'museo',zone:'manhattan',desc:'Dinosaurios, ballena azul, planetario',tags:'museo dinosaurios ciencia naturaleza ninos ballena planetario educativo'},
+  'harry potter new york': {addr:'935 Broadway, New York, NY 10010',lat:40.7400,lng:-73.9892,cat:'compras',zone:'manhattan',desc:'Tienda oficial Harry Potter, cerveza de mantequilla',tags:'tienda harry potter magia ninos juguetes'},
+  'b&h photo video': {addr:'420 9th Ave, New York, NY 10001',lat:40.7533,lng:-73.9933,cat:'compras',zone:'manhattan',desc:'Megatienda de electronica y fotografia',tags:'tienda electronica foto camara tecnologia'},
+  'new york golf center': {addr:'131 W 35th St, New York, NY 10001',lat:40.7509,lng:-73.9888,cat:'actividad',zone:'manhattan',desc:'Centro de golf cubierto',tags:'golf deporte actividad'},
+  'nba store': {addr:'545 5th Ave, New York, NY 10017',lat:40.7551,lng:-73.9787,cat:'compras',zone:'manhattan',desc:'Tienda oficial NBA, tres plantas',tags:'tienda nba baloncesto deporte ropa'},
+  'adidas flagship': {addr:'565 5th Ave, New York, NY 10017',lat:40.7561,lng:-73.9781,cat:'compras',zone:'manhattan',desc:'Flagship de Adidas en 5th Avenue',tags:'tienda adidas zapatillas ropa deporte moda'},
+  'nintendo new york': {addr:'10 Rockefeller Plaza, New York, NY 10020',lat:40.7587,lng:-73.9787,cat:'compras',zone:'manhattan',desc:'Tienda oficial Nintendo, zona de juegos',tags:'tienda nintendo videojuegos ninos mario zelda'},
+  'fao schwarz': {addr:'30 Rockefeller Plaza, New York, NY 10112',lat:40.7590,lng:-73.9786,cat:'compras',zone:'manhattan',desc:'Jugueteria historica de NYC',tags:'tienda juguetes ninos jugueteria clasico'},
+  'the lego store': {addr:'636 5th Ave, New York, NY 10020',lat:40.7584,lng:-73.9774,cat:'compras',zone:'manhattan',desc:'Tienda LEGO con figuras gigantes',tags:'tienda lego ninos juguetes construccion'},
+  'mlb flagship store': {addr:'1271 6th Ave, New York, NY 10020',lat:40.7600,lng:-73.9796,cat:'compras',zone:'manhattan',desc:'Tienda oficial de beisbol MLB',tags:'tienda mlb beisbol deporte ropa'},
+  'nike house of innovation': {addr:'650 5th Ave, New York, NY 10019',lat:40.7609,lng:-73.9770,cat:'compras',zone:'manhattan',desc:'Flagship Nike de 6 plantas',tags:'tienda nike zapatillas ropa deporte moda'},
+  'ray-ban': {addr:'673 5th Ave, New York, NY 10022',lat:40.7619,lng:-73.9753,cat:'compras',zone:'manhattan',desc:'Tienda Ray-Ban en 5th Avenue',tags:'tienda gafas rayban moda'},
+  'apple 5ta avenida': {addr:'767 5th Ave, New York, NY 10153',lat:40.7639,lng:-73.9722,cat:'compras',zone:'manhattan',desc:'Apple Store iconica con cubo de cristal',tags:'tienda apple tecnologia movil cubo cristal iconico'},
+  'aime leon dore': {addr:'224 Mulberry St, New York, NY 10012',lat:40.7228,lng:-73.9957,cat:'compras',zone:'manhattan',desc:'Marca streetwear de NYC, cafe incluido',tags:'tienda ropa streetwear moda cafe nolita'},
+  'noah': {addr:'195 Mulberry St, New York, NY 10012',lat:40.7215,lng:-73.9963,cat:'compras',zone:'manhattan',desc:'Streetwear sostenible en Nolita',tags:'tienda ropa streetwear moda sostenible nolita'},
+  'saturdays nyc': {addr:'31 Crosby St, New York, NY 10013',lat:40.7209,lng:-73.9982,cat:'compras',zone:'manhattan',desc:'Ropa surf + cafe, ambiente relajado',tags:'tienda ropa surf cafe moda soho'},
+  'kith manhattan': {addr:'337 Lafayette St, New York, NY 10012',lat:40.7262,lng:-73.9958,cat:'compras',zone:'manhattan',desc:'Sneakers y streetwear premium',tags:'tienda zapatillas sneakers ropa streetwear moda'},
+  'moma design store': {addr:'81 Spring St, New York, NY 10012',lat:40.7227,lng:-73.9990,cat:'compras',zone:'manhattan',desc:'Tienda del MoMA con objetos de diseno',tags:'tienda diseno arte regalos moma museo'},
+  'jonathan adler': {addr:'382 W Broadway, New York, NY 10012',lat:40.7237,lng:-74.0008,cat:'compras',zone:'manhattan',desc:'Decoracion y ceramica colorida',tags:'tienda decoracion hogar ceramica diseno soho'},
+  'only ny': {addr:'176 Stanton St, New York, NY 10002',lat:40.7203,lng:-73.9864,cat:'compras',zone:'manhattan',desc:'Ropa urbana hecha en NYC',tags:'tienda ropa urbana streetwear nyc'},
+  'empire state building': {addr:'20 W 34th St, New York, NY 10001',lat:40.7484,lng:-73.9857,cat:'foto',zone:'manhattan',desc:'Rascacielos iconico con observatorio',tags:'mirador vistas observatorio foto iconico rascacielos'},
+  'statue of liberty': {addr:'Liberty Island, New York, NY 10004',lat:40.6892,lng:-74.0445,cat:'foto',zone:'manhattan',desc:'La Estatua de la Libertad en ferry',tags:'estatua libertad ferry isla monumento iconico foto'},
+  'times square': {addr:'Times Square, Manhattan, NY 10036',lat:40.7580,lng:-73.9855,cat:'foto',zone:'manhattan',desc:'El cruce mas famoso del mundo, luces y pantallas',tags:'plaza luces neon pantallas iconico foto noche broadway'},
+  'brooklyn bridge': {addr:'Brooklyn Bridge, New York, NY 10038',lat:40.7061,lng:-73.9969,cat:'foto',zone:'brooklyn',desc:'Puente historico, cruzar a pie',tags:'puente foto paseo vistas historico caminar'},
+  'one world observatory': {addr:'117 West St, New York, NY 10007',lat:40.7127,lng:-74.0134,cat:'foto',zone:'manhattan',desc:'Mirador en el edificio mas alto de NYC',tags:'mirador vistas observatorio foto rascacielos wtc'},
+  'chelsea market': {addr:'75 9th Ave, New York, NY 10011',lat:40.7424,lng:-74.0061,cat:'restaurante',zone:'manhattan',desc:'Mercado gastro con puestos variados',tags:'mercado comida food hall restaurante gastronomia variado'},
+  'the met': {addr:'1000 5th Ave, New York, NY 10028',lat:40.7794,lng:-73.9632,cat:'museo',zone:'manhattan',desc:'Museo Metropolitan, arte mundial',tags:'museo arte clasico pintura escultura egipto cultura'},
+  'metropolitan museum': {addr:'1000 5th Ave, New York, NY 10028',lat:40.7794,lng:-73.9632,cat:'museo',zone:'manhattan',desc:'Museo Metropolitan de Arte',tags:'museo arte clasico pintura escultura cultura met'},
+  'moma': {addr:'11 W 53rd St, New York, NY 10019',lat:40.7614,lng:-73.9776,cat:'museo',zone:'manhattan',desc:'Museo de Arte Moderno, Picasso, Warhol',tags:'museo arte moderno contemporaneo pintura escultura cultura'},
+  'brooklyn museum': {addr:'200 Eastern Pkwy, Brooklyn, NY 11238',lat:40.6712,lng:-73.9636,cat:'museo',zone:'brooklyn',desc:'Museo de arte en Brooklyn',tags:'museo arte cultura brooklyn'},
+  'prospect park': {addr:'Prospect Park, Brooklyn, NY',lat:40.6602,lng:-73.9690,cat:'parque',zone:'brooklyn',desc:'El Central Park de Brooklyn',tags:'parque jardin naturaleza ninos paseo brooklyn'},
+  'yankee stadium': {addr:'1 E 161st St, Bronx, NY 10451',lat:40.8296,lng:-73.9262,cat:'actividad',zone:'bronx',desc:'Estadio de los Yankees, tours disponibles',tags:'estadio beisbol deporte yankees bronx'},
+  'bronx zoo': {addr:'2300 Southern Blvd, Bronx, NY 10460',lat:40.8506,lng:-73.8769,cat:'actividad',zone:'bronx',desc:'Zoo enorme, ideal para ninos',tags:'zoo animales ninos naturaleza bronx familia'},
+  'staten island ferry': {addr:'4 Whitehall St, New York, NY 10004',lat:40.7013,lng:-74.0131,cat:'transporte',zone:'staten',desc:'Ferry gratis con vistas a la Estatua de la Libertad',tags:'ferry gratis vistas estatua libertad barco transporte'},
+  'edge observation deck': {addr:'30 Hudson Yards, New York, NY 10001',lat:40.7537,lng:-74.0007,cat:'foto',zone:'manhattan',desc:'Mirador al aire libre en Hudson Yards',tags:'mirador vistas observatorio foto hudson yards'},
+  'summit one vanderbilt': {addr:'1 Vanderbilt Ave, New York, NY 10017',lat:40.7531,lng:-73.9789,cat:'foto',zone:'manhattan',desc:'Experiencia inmersiva con espejos y vistas',tags:'mirador vistas observatorio foto espejos inmersivo'},
+  'vessel hudson yards': {addr:'20 Hudson Yards, New York, NY 10001',lat:40.7536,lng:-74.0022,cat:'foto',zone:'manhattan',desc:'Estructura de escaleras en Hudson Yards',tags:'estructura escaleras foto arquitectura hudson yards'},
+  'little island': {addr:'Pier 55, Hudson River Park, New York, NY',lat:40.7425,lng:-74.0100,cat:'parque',zone:'manhattan',desc:'Parque flotante sobre el rio Hudson',tags:'parque isla flotante rio hudson jardin'},
+  '9/11 memorial': {addr:'180 Greenwich St, New York, NY 10007',lat:40.7115,lng:-74.0134,cat:'museo',zone:'manhattan',desc:'Memorial y museo del 11-S',tags:'memorial museo historia wtc torres gemelas'},
+  'dylan candy bar': {addr:'1011 3rd Ave, New York, NY 10065',lat:40.7632,lng:-73.9645,cat:'compras',zone:'manhattan',desc:'Tienda de chuches gigante, paraiso para ninos',tags:'tienda dulces chuches ninos golosinas'},
+  'economy candy': {addr:'108 Rivington St, New York, NY 10002',lat:40.7198,lng:-73.9877,cat:'compras',zone:'manhattan',desc:'Tienda de dulces retro desde 1937',tags:'tienda dulces chuches retro historico golosinas'},
+  'shake shack': {addr:'Madison Square Park, New York, NY 10010',lat:40.7408,lng:-73.9881,cat:'restaurante',zone:'manhattan',desc:'Hamburguesas iconicas de NYC',tags:'restaurante hamburguesa comida rapida iconico'},
+  'levain bakery': {addr:'167 W 74th St, New York, NY 10023',lat:40.7795,lng:-73.9779,cat:'restaurante',zone:'manhattan',desc:'Las mejores cookies de Nueva York',tags:'panaderia cookies galletas dulce postre'},
+  'pizza suprema': {addr:'413 8th Ave, New York, NY 10001',lat:40.7505,lng:-73.9938,cat:'restaurante',zone:'manhattan',desc:'Pizza clasica de NYC cerca de Penn Station',tags:'pizza restaurante comida italiana clasico'},
+  'joes pizza': {addr:'7 Carmine St, New York, NY 10014',lat:40.7306,lng:-74.0022,cat:'restaurante',zone:'manhattan',desc:'Pizza al corte legendaria del Village',tags:'pizza restaurante comida italiana clasico village'},
+  'los tacos no 1': {addr:'75 9th Ave, New York, NY 10011',lat:40.7424,lng:-74.0061,cat:'restaurante',zone:'manhattan',desc:'Tacos mexicanos en Chelsea Market',tags:'tacos mexicano restaurante comida chelsea market'},
+  'the oculus': {addr:'185 Greenwich St, New York, NY 10007',lat:40.7112,lng:-74.0113,cat:'foto',zone:'manhattan',desc:'Estacion de Calatrava, arquitectura impresionante',tags:'arquitectura estacion foto calatrava wtc'},
+  'washington square park': {addr:'Washington Square, New York, NY 10012',lat:40.7308,lng:-73.9973,cat:'parque',zone:'manhattan',desc:'Parque con arco, musicos callejeros',tags:'parque arco musica callejeros greenwich village nyu'},
+  'union square': {addr:'Union Square, New York, NY 10003',lat:40.7359,lng:-73.9911,cat:'parque',zone:'manhattan',desc:'Plaza con mercado de agricultores',tags:'plaza mercado parque union'},
+  'flatiron building': {addr:'175 5th Ave, New York, NY 10010',lat:40.7411,lng:-73.9897,cat:'foto',zone:'manhattan',desc:'Edificio triangular iconico',tags:'edificio foto arquitectura iconico triangular'},
+  'new york public library': {addr:'476 5th Ave, New York, NY 10018',lat:40.7532,lng:-73.9822,cat:'cultura',zone:'manhattan',desc:'Biblioteca publica con leones iconicos, exposiciones gratuitas',tags:'biblioteca library cultura edificio historico gratis exposicion leones'},
+  'children museum of manhattan': {addr:'212 W 83rd St, New York, NY 10024',lat:40.7851,lng:-73.9729,cat:'museo',zone:'manhattan',desc:'Museo interactivo para ninos',tags:'museo ninos infantil interactivo jugar educativo'},
+  'brooklyn children museum': {addr:'145 Brooklyn Ave, Brooklyn, NY 11213',lat:40.6728,lng:-73.9440,cat:'museo',zone:'brooklyn',desc:'Primer museo para ninos del mundo',tags:'museo ninos infantil interactivo jugar brooklyn'},
+  'central park zoo': {addr:'64th St and 5th Ave, New York, NY 10065',lat:40.7678,lng:-73.9718,cat:'actividad',zone:'manhattan',desc:'Zoo pequeno ideal para familias en Central Park',tags:'zoo animales ninos familia central park'},
+  'american girl place': {addr:'75 Rockefeller Plaza, New York, NY 10019',lat:40.7590,lng:-73.9790,cat:'compras',zone:'manhattan',desc:'Tienda de munecas American Girl',tags:'tienda munecas ninas juguetes'},
+  'madame tussauds': {addr:'234 W 42nd St, New York, NY 10036',lat:40.7564,lng:-73.9888,cat:'actividad',zone:'manhattan',desc:'Museo de cera con famosos',tags:'museo cera famosos celebridades foto divertido ninos'},
+  'ripley believe it or not': {addr:'234 W 42nd St, New York, NY 10036',lat:40.7564,lng:-73.9888,cat:'actividad',zone:'manhattan',desc:'Museo de curiosidades y records',tags:'museo curiosidades records divertido ninos'},
+  'spyscape': {addr:'928 8th Ave, New York, NY 10019',lat:40.7638,lng:-73.9844,cat:'actividad',zone:'manhattan',desc:'Museo interactivo de espias',tags:'museo espias interactivo ninos divertido juego'},
+  'color factory': {addr:'251 Spring St, New York, NY 10013',lat:40.7256,lng:-74.0042,cat:'actividad',zone:'manhattan',desc:'Exposicion interactiva de colores para fotos',tags:'exposicion interactivo foto colores instagram divertido ninos'},
+  'camp store': {addr:'110 5th Ave, New York, NY 10011',lat:40.7388,lng:-73.9926,cat:'compras',zone:'manhattan',desc:'Tienda-experiencia para familias con zona de juegos',tags:'tienda ninos juguetes experiencia juegos familia interactivo'},
+  'museum of ice cream': {addr:'558 Broadway, New York, NY 10012',lat:40.7237,lng:-73.9979,cat:'actividad',zone:'manhattan',desc:'Museo interactivo del helado, piscina de sprinkles',tags:'museo helado interactivo foto instagram divertido ninos dulces'},
+  'gulliver gate': {addr:'216 W 44th St, New York, NY 10036',lat:40.7574,lng:-73.9878,cat:'actividad',zone:'manhattan',desc:'Mundo en miniatura, ciudades a escala',tags:'miniatura maqueta ciudades interactivo ninos divertido'},
+  'smorgasburg williamsburg': {addr:'90 Kent Ave, Brooklyn, NY 11211',lat:40.7218,lng:-73.9614,cat:'restaurante',zone:'brooklyn',desc:'Mercado de comida al aire libre los sabados',tags:'mercado comida food puestos sabado aire libre brooklyn'},
+  'di fara pizza': {addr:'1424 Avenue J, Brooklyn, NY 11230',lat:40.6250,lng:-73.9613,cat:'restaurante',zone:'brooklyn',desc:'Considerada la mejor pizza de NYC',tags:'pizza restaurante comida italiana clasico brooklyn'},
+  'grimaldis pizzeria': {addr:'1 Front St, Brooklyn, NY 11201',lat:40.6994,lng:-73.9934,cat:'restaurante',zone:'brooklyn',desc:'Pizza de horno de carbon bajo el Brooklyn Bridge',tags:'pizza restaurante comida italiana dumbo brooklyn'},
+  'peter luger steak house': {addr:'178 Broadway, Brooklyn, NY 11211',lat:40.7098,lng:-73.9624,cat:'restaurante',zone:'brooklyn',desc:'Steakhouse legendario desde 1887',tags:'restaurante carne steak clasico historico brooklyn'},
+  'jane carousel': {addr:'Old Dock St, Brooklyn, NY 11201',lat:40.7043,lng:-73.9904,cat:'actividad',zone:'brooklyn',desc:'Carrusel vintage en DUMBO con vistas al puente',tags:'carrusel ninos dumbo brooklyn vintage diversiones'},
+  'domino park': {addr:'15 River St, Brooklyn, NY 11249',lat:40.7134,lng:-73.9680,cat:'parque',zone:'brooklyn',desc:'Parque en Williamsburg con juegos de agua para ninos',tags:'parque ninos juegos agua williamsburg brooklyn'},
+  'grand central terminal': {addr:'89 E 42nd St, New York, NY 10017',lat:40.7527,lng:-73.9772,cat:'foto',zone:'manhattan',desc:'Estacion de tren historica con techo estrellado',tags:'estacion historico arquitectura foto techo estrellas'},
+  'eataly nyc': {addr:'200 5th Ave, New York, NY 10010',lat:40.7421,lng:-73.9897,cat:'restaurante',zone:'manhattan',desc:'Mercado italiano con restaurantes y tienda',tags:'italiano mercado comida restaurante tienda gastronomia'},
+  'hudson yards': {addr:'20 Hudson Yards, New York, NY 10001',lat:40.7536,lng:-74.0022,cat:'compras',zone:'manhattan',desc:'Centro comercial moderno con tiendas de lujo',tags:'centro comercial tiendas lujo moderno compras'},
+  'roosevelt island tramway': {addr:'Second Ave and 59th St, New York, NY 10022',lat:40.7613,lng:-73.9669,cat:'transporte',zone:'manhattan',desc:'Teleferico sobre el East River, vistas aereas',tags:'teleferico transporte vistas rio aereo foto'},
+  'new york aquarium': {addr:'602 Surf Ave, Brooklyn, NY 11224',lat:40.5744,lng:-73.9755,cat:'actividad',zone:'brooklyn',desc:'Acuario junto a Coney Island',tags:'acuario peces animales marinos ninos familia brooklyn coney island'},
+  'liberty science center': {addr:'222 Jersey City Blvd, Jersey City, NJ 07305',lat:40.7065,lng:-74.0551,cat:'museo',zone:'manhattan',desc:'Centro de ciencias interactivo al otro lado del Hudson',tags:'museo ciencia interactivo ninos educativo experimentos'},
+  'south street seaport': {addr:'19 Fulton St, New York, NY 10038',lat:40.7063,lng:-74.0033,cat:'foto',zone:'manhattan',desc:'Puerto historico con tiendas y vistas',tags:'puerto historico foto tiendas vistas barcos'}
+};
+
+// Search aliases: maps common search terms to NYC_DB keys
+var SEARCH_ALIASES = {
+  'library':'new york public library biblioteca',
+  'biblioteca':'new york public library',
+  'libreria':'new york public library',
+  'museum':'natural history museum the met moma brooklyn museum children museum 9/11 memorial intrepid museum',
+  'museo':'natural history museum the met moma brooklyn museum children museum 9/11 memorial intrepid museum',
+  'pizza':'joes pizza pizza suprema di fara pizza grimaldis pizzeria',
+  'hamburguesa':'shake shack',
+  'burger':'shake shack',
+  'helado':'museum of ice cream',
+  'ice cream':'museum of ice cream',
+  'dulce':'dylan candy bar economy candy levain bakery museum of ice cream',
+  'candy':'dylan candy bar economy candy',
+  'juguete':'fao schwarz the lego store camp store nintendo new york american girl place',
+  'toy':'fao schwarz the lego store camp store',
+  'ninos':'children museum of manhattan brooklyn children museum central park zoo bronx zoo fao schwarz the lego store camp store color factory spyscape coney island jane carousel domino park new york aquarium',
+  'kids':'children museum of manhattan brooklyn children museum central park zoo bronx zoo fao schwarz the lego store camp store',
+  'mirador':'top of the rock empire state building one world observatory edge observation deck summit one vanderbilt',
+  'views':'top of the rock empire state building one world observatory edge observation deck summit one vanderbilt',
+  'vistas':'top of the rock empire state building one world observatory edge observation deck summit one vanderbilt',
+  'observatorio':'top of the rock empire state building one world observatory edge observation deck summit one vanderbilt',
+  'parque':'central park high line prospect park washington square park little island domino park',
+  'park':'central park high line prospect park washington square park little island domino park',
+  'comida':'chelsea market los tacos no 1 eataly nyc smorgasburg williamsburg shake shack katz delicatessen',
+  'food':'chelsea market los tacos no 1 eataly nyc smorgasburg williamsburg shake shack katz delicatessen',
+  'comer':'chelsea market los tacos no 1 eataly nyc shake shack katz delicatessen',
+  'ropa':'nike house of innovation adidas flagship kith manhattan aime leon dore noah saturdays nyc only ny',
+  'zapatillas':'nike house of innovation adidas flagship kith manhattan',
+  'sneakers':'nike house of innovation adidas flagship kith manhattan',
+  'deporte':'nba store mlb flagship store nike house of innovation adidas flagship yankee stadium new york golf center',
+  'sport':'nba store mlb flagship store nike house of innovation adidas flagship yankee stadium',
+  'foto':'top of the rock empire state building brooklyn bridge grand central terminal the oculus flatiron building dumbo brooklyn bridge',
+  'animal':'bronx zoo central park zoo new york aquarium',
+  'zoo':'bronx zoo central park zoo',
+  'acuario':'new york aquarium',
+  'aquarium':'new york aquarium',
+  'ciencia':'natural history museum liberty science center spyscape intrepid museum',
+  'science':'natural history museum liberty science center spyscape intrepid museum',
+  'arte':'the met moma brooklyn museum moma design store',
+  'art':'the met moma brooklyn museum moma design store',
+  'gratis':'staten island ferry washington square park central park high line new york public library',
+  'free':'staten island ferry washington square park central park high line new york public library',
+  'mercado':'chelsea market smorgasburg williamsburg eataly nyc',
+  'market':'chelsea market smorgasburg williamsburg eataly nyc',
+  'ferry':'staten island ferry statue of liberty',
+  'barco':'staten island ferry statue of liberty',
+  'tren':'roosevelt island tramway grand central terminal',
+  'interactivo':'spyscape color factory museum of ice cream children museum of manhattan brooklyn children museum gulliver gate camp store'
+};
+
+function findInDB(name) {
+  var key = name.toLowerCase().trim();
+  if (NYC_DB[key]) return NYC_DB[key];
+  var keys = Object.keys(NYC_DB);
+  for (var i = 0; i < keys.length; i++) {
+    if (sim(key, keys[i]) > 0.75) return NYC_DB[keys[i]];
+  }
+  return null;
+}
+
+function mapsUrl(name, addr, lat, lng) {
+  if (lat && lng) return 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lng;
+  var q = (name || '') + ' ' + (addr || 'New York NY');
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q.trim());
+}
+
+function mapsRouteUrl(siteList) {
+  if (!siteList || !siteList.length) return '';
+  var waypoints = siteList.map(function(s) {
+    if (s.lat && s.lng) return s.lat + ',' + s.lng;
+    return encodeURIComponent((s.name || '') + ' ' + (s.addr || 'New York NY'));
+  });
+  if (waypoints.length === 1) {
+    return 'https://www.google.com/maps/dir/?api=1&destination=' + waypoints[0] + '&travelmode=walking';
+  }
+  var origin = waypoints[0];
+  var destination = waypoints[waypoints.length - 1];
+  var middle = waypoints.slice(1, -1).join('%7C');
+  var url = 'https://www.google.com/maps/dir/?api=1&origin=' + origin + '&destination=' + destination + '&travelmode=walking';
+  if (middle) url += '&waypoints=' + middle;
+  return url;
+}
+
+function enrichPlace(p) {
+  var info = findInDB(p.name);
+  if (info) {
+    if (!p.addr) p.addr = info.addr;
+    if (!p.lat) p.lat = info.lat;
+    if (!p.lng) p.lng = info.lng;
+  }
+  return p;
+}
+
+// Firebase init
+var firebaseConfig = {
+  apiKey: "AIzaSyD8KniYNOlkAR7iropfzbq_IE_R58cMkkQ",
+  authDomain: "nyc-trip-2025.firebaseapp.com",
+  databaseURL: "https://nyc-trip-2025-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "nyc-trip-2025",
+  storageBucket: "nyc-trip-2025.firebasestorage.app",
+  messagingSenderId: "59884407479",
+  appId: "1:59884407479:web:59ecb4cd2a7e9c0f645b32"
+};
+var fbApp = null;
+var fbDb = null;
+var fbReady = false;
+var fbSaving = 0; // timestamp of last save
+
+try {
+  fbApp = firebase.initializeApp(firebaseConfig);
+  fbDb = firebase.database();
+  fbReady = true;
+} catch(e) {
+  fbReady = false;
+}
+
+function load() {
+  // Load from localStorage first (fast, offline-capable)
+  try { places = JSON.parse(localStorage.getItem(SK)) || []; } catch(e) { places = []; }
+  try { voted = JSON.parse(localStorage.getItem(VK)) || []; } catch(e) { voted = []; }
+  if (!places.length) { places = SEED.slice(); }
+  places.forEach(function(p){ enrichPlace(p); });
+
+  // Then subscribe to Firebase for real-time sync
+  if (fbReady) {
+    fbDb.ref('places').on('value', function(snapshot) {
+      // Skip if we just saved (within 2 seconds)
+      if (Date.now() - fbSaving < 2000) return;
+      var data = snapshot.val();
+      if (data && data.length) {
+        places = data;
+        places.forEach(function(p){ enrichPlace(p); });
+        try { localStorage.setItem(SK, JSON.stringify(places)); } catch(e) {}
+        render();
+      }
+    });
+    fbDb.ref('voted').on('value', function(snapshot) {
+      if (Date.now() - fbSaving < 2000) return;
+      var data = snapshot.val();
+      if (data) {
+        voted = data;
+        try { localStorage.setItem(VK, JSON.stringify(voted)); } catch(e) {}
+      }
+    });
+    // Push initial data if Firebase is empty
+    fbDb.ref('places').once('value', function(snapshot) {
+      var data = snapshot.val();
+      if (!data || !data.length) {
+        fbSaving = Date.now();
+        fbDb.ref('places').set(places);
+      }
+    });
+  } else {
+    save();
+  }
+}
+
+function save() {
+  try {
+    localStorage.setItem(SK, JSON.stringify(places));
+    localStorage.setItem(VK, JSON.stringify(voted));
+  } catch(e) {}
+  if (fbReady) {
+    fbSaving = Date.now();
+    fbDb.ref('places').set(places);
+    fbDb.ref('voted').set(voted);
+  }
+}
+
+function render() { renderStats(); renderPlaces(); }
+
+function renderStats() {
+  var zones = {}, cats = {}, top = 0, topN = '';
+  places.forEach(function(p) {
+    zones[p.zone] = 1; cats[p.cat] = 1;
+    if (p.votes > top) { top = p.votes; topN = p.name.split(' ')[0]; }
+  });
+  document.getElementById('stats-row').innerHTML =
+    sc(places.length, 'Sitios') + sc(Object.keys(zones).length, 'Zonas') +
+    sc(Object.keys(cats).length, 'Categorias') + sc(top, topN || 'Max votos');
+}
+
+function sc(n, l) {
+  return '<div class="stat-card"><div class="stat-num">'+n+'</div><div class="stat-label">'+l+'</div></div>';
+}
+
+function renderPlaces() {
+  var list = filter === 'all' ? places.slice() : places.filter(function(p){return p.zone===filter;});
+  list.sort(function(a,b){return b.votes-a.votes;});
+  var g = document.getElementById('places-grid');
+  if (!list.length) { g.innerHTML = '<div class="empty">No hay sitios en esta zona.</div>'; return; }
+  g.innerHTML = list.map(function(p) {
+    var v = voted.indexOf(p.id) > -1;
+    var mu = mapsUrl(p.name, p.addr, p.lat, p.lng);
+    return '<div class="place-card">'+
+      '<button class="del-btn" onclick="del('+p.id+')">&#x2715;</button>'+
+      '<span class="zone-badge z-'+p.zone+'">'+ZL[p.zone]+'</span>'+
+      '<span class="cat-badge">'+p.cat+'</span>'+
+      '<div class="place-name">'+esc(p.name)+'</div>'+
+      (p.addr?'<div class="place-addr">'+esc(p.addr)+'</div>':'')+
+      (p.notes?'<div class="place-notes">'+esc(p.notes)+'</div>':'')+
+      '<div class="place-who">Por: '+(p.who?esc(p.who):'Anonimo')+'</div>'+
+      '<button class="vote-btn'+(v?' voted':'')+ '" onclick="vote('+p.id+')">'+
+        (v?'&#10003;':'+')+'&nbsp;<strong>'+p.votes+'</strong> votos</button>'+
+      '<a class="maps-link" href="'+mu+'" target="_blank" rel="noopener">Maps</a>'+
+    '</div>';
+  }).join('');
+}
+
+function renderZones() {
+  var zm = {};
+  VZ.forEach(function(z){zm[z]=[];});
+  places.forEach(function(p){if(zm[p.zone])zm[p.zone].push(p);});
+  var html = '';
+  VZ.forEach(function(z) {
+    var items = zm[z]; if (!items.length) return;
+    items.sort(function(a,b){return b.votes-a.votes;});
+    var routeUrl = mapsRouteUrl(items);
+    html += '<div class="zone-block" style="border-left-color:'+ZC[z]+'">'+
+      '<h3 style="color:'+ZC[z]+'">'+ZL[z]+' ('+items.length+' sitios)</h3><ul>'+
+      items.map(function(p){
+        var mu = mapsUrl(p.name, p.addr, p.lat, p.lng);
+        return '<li><strong>'+esc(p.name)+'</strong> <span class="cat-badge">'+p.cat+'</span>'+
+          '<span style="color:#555;font-size:0.75rem;margin-left:8px">'+p.votes+' votos</span>'+
+          (p.addr?'<div class="place-addr">'+esc(p.addr)+'</div>':'')+
+          (p.notes?'<div style="color:#555;font-size:0.78rem;margin-top:2px">'+esc(p.notes)+'</div>':'')+
+          '<a class="maps-link" href="'+mu+'" target="_blank" rel="noopener">Maps</a>'+
+          '</li>';
+      }).join('')+'</ul>'+
+      (routeUrl?'<a class="maps-route" href="'+routeUrl+'" target="_blank" rel="noopener">Ruta por '+ZL[z]+' en Google Maps</a>':'')+
+      '</div>';
+  });
+  document.getElementById('zones-view').innerHTML = html || '<div class="empty">Anade sitios para verlos por zona.</div>';
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+var searchResults = [];
+var selectedResult = null;
+
+function searchPlaces() {
+  var query = document.getElementById('search-input').value.trim();
+  if (!query) { toast('Escribe algo para buscar'); return; }
+  if (query.length < 2) { toast('Escribe al menos 2 caracteres'); return; }
+  var btn = document.getElementById('search-btn');
+  btn.disabled = true; btn.textContent = 'Buscando...';
+  var prog = document.getElementById('search-progress');
+  var fill = document.getElementById('search-fill');
+  prog.style.display = 'block'; fill.style.width = '30%';
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('search-confirm').style.display = 'none';
+  selectedResult = null;
+
+  var existing = places.map(function(p) { return p.name.toLowerCase(); });
+
+  var prompt = 'Busca sitios reales de Nueva York que coincidan con: "' + query + '"\n\n' +
+    'Devuelve entre 3 y 6 resultados. Escribe UNA linea por sitio con este formato pipe-delimited:\n' +
+    'NOMBRE|ZONA|CATEGORIA|DIRECCION|DESCRIPCION_CORTA\n\n' +
+    'Reglas:\n' +
+    '- Solo sitios REALES que existen en Nueva York\n' +
+    '- ZONA: manhattan, brooklyn, queens, bronx o staten\n' +
+    '- CATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\n' +
+    '- DIRECCION: direccion real del sitio\n' +
+    '- DESCRIPCION_CORTA: frase corta describiendo el sitio (max 80 caracteres)\n' +
+    '- Solo las lineas de datos, sin numeracion, encabezados ni explicaciones\n' +
+    '- Prioriza sitios aptos para familias con ninos de 5 a 15 anos\n\n' +
+    'Ejemplo:\n' +
+    'Central Park Zoo|manhattan|actividad|64th St and 5th Ave, New York|Zoo pequeno ideal para ninos\n' +
+    'Shake Shack Madison Square|manhattan|restaurante|Madison Square Park, New York|Hamburguesas iconicas al aire libre';
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    fill.style.width = '90%';
+    if (data.error) throw new Error(data.error.message);
+    var raw = (data.content || []).map(function(b) { return b.text || ''; }).join('');
+    var parsed = raw.split('\n')
+      .map(function(l) { return l.trim(); })
+      .filter(function(l) { return l.indexOf('|') > -1; })
+      .map(function(l) {
+        var parts = l.split('|').map(function(p) { return p.replace(/^\d+[\.\)]\s*/, '').replace(/^[-*]\s*/, '').trim(); });
+        var name = parts[0]; if (!name || name.length < 2) return null;
+        var zone = VZ.filter(function(z) { return (parts[1] || '').toLowerCase().indexOf(z) > -1; })[0] || 'manhattan';
+        var cat = VC.filter(function(c) { return (parts[2] || '').toLowerCase().indexOf(c) > -1; })[0] || 'otro';
+        var addr = parts[3] || '';
+        var desc = parts[4] || '';
+        var isDup = existing.some(function(n) { return sim(n, name) > 0.75; });
+        return { name: name, zone: zone, cat: cat, addr: addr, desc: desc, isDup: isDup };
+      })
+      .filter(function(x) { return x !== null; });
+
+    searchResults = parsed;
+    renderSearchResults();
+    toast(parsed.length + ' sitios encontrados');
+  })
+  .catch(function(err) {
+    var localResults = searchLocal(query);
+    if (localResults.length > 0) {
+      searchResults = localResults;
+      renderSearchResults();
+      toast(localResults.length + ' sitios encontrados');
+    } else {
+      document.getElementById('search-results').innerHTML =
+        '<div style="color:#888;font-size:0.82rem;padding:12px 0;line-height:1.6">' +
+        'No se encontraron sitios para "<strong>' + esc(query) + '</strong>".<br>' +
+        'Prueba con otra busqueda (ej: museo, pizza, ninos, parque, mirador...)</div>';
+    }
+  })
+  .finally(function() {
+    btn.disabled = false; btn.textContent = 'Buscar';
+    setTimeout(function() { prog.style.display = 'none'; fill.style.width = '0'; }, 400);
+  });
+}
+
+function searchLocal(query) {
+  var q = query.toLowerCase().trim();
+  var words = q.split(/\s+/).filter(function(w) { return w.length > 1; });
+  var keys = Object.keys(NYC_DB);
+  var existing = places.map(function(p) { return p.name.toLowerCase(); });
+  var scored = [];
+
+  // First check aliases to expand search
+  var aliasKeys = [];
+  words.forEach(function(w) {
+    Object.keys(SEARCH_ALIASES).forEach(function(alias) {
+      if (alias.indexOf(w) > -1 || w.indexOf(alias) > -1) {
+        var refs = SEARCH_ALIASES[alias].split(' ');
+        // collect multi-word DB keys from the alias string
+        keys.forEach(function(k) {
+          if (SEARCH_ALIASES[alias].indexOf(k) > -1) {
+            aliasKeys.push(k);
+          }
+        });
+      }
+    });
+  });
+
+  keys.forEach(function(key) {
+    var info = NYC_DB[key];
+    var score = 0;
+    var searchText = key + ' ' + (info.tags || '') + ' ' + (info.desc || '') + ' ' + (info.addr || '');
+
+    // Direct name match
+    if (key.indexOf(q) > -1) score += 10;
+    if (q.indexOf(key) > -1 && key.length > 3) score += 8;
+
+    // Word-level matches
+    words.forEach(function(w) {
+      if (key.indexOf(w) > -1) score += 5;
+      if ((info.tags || '').indexOf(w) > -1) score += 3;
+      if ((info.desc || '').indexOf(w) > -1) score += 2;
+      if ((info.cat || '').indexOf(w) > -1) score += 4;
+    });
+
+    // Alias match
+    if (aliasKeys.indexOf(key) > -1) score += 6;
+
+    if (score > 0) {
+      var name = key.split(' ').map(function(w) {
+        if (w === 'nyc' || w === 'ny' || w === 'nba' || w === 'mlb') return w.toUpperCase();
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      }).join(' ');
+      var isDup = existing.some(function(n) { return sim(n, name) > 0.75; });
+      scored.push({ name: name, zone: info.zone || guessZone(name + ' ' + (info.addr || '')), cat: info.cat || guessCat(name, searchText), addr: info.addr || '', desc: info.desc || '', isDup: isDup, score: score });
+    }
+  });
+
+  scored.sort(function(a, b) { return b.score - a.score; });
+  return scored.slice(0, 8);
+}
+
+function renderSearchResults() {
+  if (!searchResults.length) {
+    document.getElementById('search-results').innerHTML = '<div class="empty">No se encontraron sitios.</div>';
+    return;
+  }
+  var html = '<div class="search-result-list">';
+  searchResults.forEach(function(r, i) {
+    html += '<div class="search-result-item' + (r.isDup ? ' is-dup' : '') + '" onclick="' + (r.isDup ? '' : 'selectSearchResult(' + i + ')') + '">' +
+      '<div class="sr-name">' + esc(r.name) + (r.isDup ? ' <span class="sr-dup-tag">ya existe</span>' : '') + '</div>' +
+      '<div class="sr-meta">' +
+        '<span class="zone-badge z-' + r.zone + '">' + ZL[r.zone] + '</span>' +
+        '<span class="cat-badge">' + r.cat + '</span>' +
+      '</div>' +
+      (r.addr ? '<div class="sr-desc">' + esc(r.addr) + '</div>' : '') +
+      (r.desc ? '<div class="sr-desc">' + esc(r.desc) + '</div>' : '') +
+    '</div>';
+  });
+  html += '</div>';
+  document.getElementById('search-results').innerHTML = html;
+}
+
+function selectSearchResult(idx) {
+  selectedResult = searchResults[idx];
+  if (!selectedResult) return;
+  document.getElementById('search-results').innerHTML = '';
+  var info = '<div class="sp-name">' + esc(selectedResult.name) + '</div>' +
+    '<div class="sp-details">' +
+      '<span class="zone-badge z-' + selectedResult.zone + '">' + ZL[selectedResult.zone] + '</span> ' +
+      '<span class="cat-badge">' + selectedResult.cat + '</span><br>' +
+      (selectedResult.addr ? esc(selectedResult.addr) + '<br>' : '') +
+      (selectedResult.desc ? esc(selectedResult.desc) : '') +
+    '</div>';
+  document.getElementById('selected-place-info').innerHTML = info;
+  document.getElementById('search-confirm').style.display = 'block';
+  document.getElementById('inp-notes').value = selectedResult.desc || '';
+}
+
+function confirmSearchAdd() {
+  if (!selectedResult) return;
+  var notes = document.getElementById('inp-notes').value.trim();
+  var who = document.getElementById('inp-who').value.trim();
+  var p = {
+    id: Date.now(),
+    name: selectedResult.name,
+    zone: selectedResult.zone,
+    cat: selectedResult.cat,
+    notes: notes,
+    who: who,
+    votes: 0,
+    addr: selectedResult.addr || ''
+  };
+  enrichPlace(p);
+  places.push(p);
+  save(); render();
+  cancelSearchAdd();
+  document.getElementById('search-input').value = '';
+  toast('"' + p.name + '" anadido');
+}
+
+function cancelSearchAdd() {
+  selectedResult = null;
+  searchResults = [];
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('search-confirm').style.display = 'none';
+  document.getElementById('inp-notes').value = '';
+  document.getElementById('inp-who').value = '';
+}
+
+// Enter key triggers search
+document.getElementById('search-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' || e.keyCode === 13) { searchPlaces(); }
+});
+
+function del(id) {
+  places = places.filter(function(p){return p.id!==id;});
+  save(); render();
+}
+
+function vote(id) {
+  var i = voted.indexOf(id);
+  var p = places.find(function(x){return x.id===id;});
+  if (!p) return;
+  if (i>-1) { voted.splice(i,1); p.votes=Math.max(0,p.votes-1); }
+  else { voted.push(id); p.votes++; }
+  save(); renderPlaces(); renderStats();
+}
+
+function setFilter(z, btn) {
+  filter = z;
+  document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active'); renderPlaces();
+}
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('tab-'+tab).classList.add('active');
+  btn.classList.add('active');
+  if (tab==='zones') renderZones();
+}
+
+function sim(a,b) {
+  a=a.toLowerCase(); b=b.toLowerCase();
+  if (a===b) return 1;
+  if (a.indexOf(b)>-1||b.indexOf(a)>-1) return 0.9;
+  var wa=a.split(/\s+/).filter(function(w){return w.length>3;});
+  var wb=b.split(/\s+/).filter(function(w){return w.length>3;});
+  if (!wa.length||!wb.length) return 0;
+  var s=wa.filter(function(w){return wb.some(function(x){return x.indexOf(w)>-1||w.indexOf(x)>-1;});});
+  return s.length/Math.max(wa.length,wb.length);
+}
+
+function guessZone(text) {
+  var t = text.toLowerCase();
+  if (t.indexOf('brooklyn')>-1||t.indexOf('dumbo')>-1||t.indexOf('williamsburg')>-1) return 'brooklyn';
+  if (t.indexOf('queens')>-1||t.indexOf('astoria')>-1||t.indexOf('flushing')>-1) return 'queens';
+  if (t.indexOf('bronx')>-1) return 'bronx';
+  if (t.indexOf('staten')>-1) return 'staten';
+  if (t.indexOf('soho')>-1||t.indexOf('nolita')>-1||t.indexOf('tribeca')>-1||
+      t.indexOf('chelsea')>-1||t.indexOf('5th av')>-1||t.indexOf('5a av')>-1||
+      t.indexOf('broadway')>-1||t.indexOf('rockefeller')>-1||t.indexOf('times sq')>-1||
+      t.indexOf('central park')>-1||t.indexOf('manhattan')>-1||t.indexOf('harlem')>-1||
+      t.indexOf('midtown')>-1||t.indexOf('east village')>-1||t.indexOf('west village')>-1||
+      t.indexOf('lower east')>-1||t.indexOf('upper east')>-1||t.indexOf('upper west')>-1||
+      t.indexOf('mulberry')>-1||t.indexOf('lafayette')>-1||t.indexOf('crosby')>-1||
+      t.indexOf('spring st')>-1||t.indexOf('stanton')>-1) return 'manhattan';
+  return 'manhattan';
+}
+
+function guessCat(nameOnly, fullText) {
+  var n = nameOnly.toLowerCase();
+  var t = fullText.toLowerCase();
+  if (n.indexOf('museum')>-1||n.indexOf('museo')>-1||n.indexOf('gallery')>-1||n.indexOf('galeria')>-1) return 'museo';
+  if (n.indexOf('store')>-1||n.indexOf('shop')>-1||n.indexOf('flagship')>-1||
+      n.indexOf('nike')>-1||n.indexOf('adidas')>-1||n.indexOf('lego')>-1||
+      n.indexOf('apple')>-1||n.indexOf('ray-ban')>-1||n.indexOf('fao')>-1||
+      n.indexOf('kith')>-1||n.indexOf('noah')>-1||n.indexOf('only ny')>-1) return 'compras';
+  if (t.indexOf('tienda')>-1||t.indexOf('ropa')>-1||t.indexOf('zapatillas')>-1||
+      t.indexOf('sneaker')>-1||t.indexOf('comprar')>-1||t.indexOf('jugueteria')>-1||
+      t.indexOf('decoracion')>-1||t.indexOf('design store')>-1||t.indexOf('marca')>-1||
+      t.indexOf('camisetas')>-1) return 'compras';
+  if (n.indexOf('park')>-1&&n.indexOf('parking')<0) return 'parque';
+  if (n.indexOf('nba')>-1||n.indexOf('mlb')>-1||n.indexOf('golf')>-1||
+      n.indexOf('nintendo')>-1) return 'actividad';
+  if (t.indexOf('jugar')>-1||t.indexOf('deporte')>-1||t.indexOf('playa')>-1||
+      t.indexOf('beach')>-1||t.indexOf('zoo')>-1||t.indexOf('aventura')>-1) return 'actividad';
+  if (n.indexOf('deli')>-1||n.indexOf('pizza')>-1||n.indexOf('cafe')>-1||
+      n.indexOf('bakery')>-1||n.indexOf('restaurant')>-1) return 'restaurante';
+  if (t.indexOf('restaurante')>-1||t.indexOf('comida')>-1||t.indexOf('food')>-1||
+      t.indexOf('comer')>-1) return 'restaurante';
+  if (t.indexOf('mirador')>-1||t.indexOf('vista')>-1||n.indexOf('top of')>-1||
+      t.indexOf('observat')>-1||t.indexOf('foto')>-1||n.indexOf('bridge')>-1) return 'foto';
+  if (t.indexOf('teatro')>-1||t.indexOf('theater')>-1||t.indexOf('musical')>-1) return 'cultura';
+  return 'otro';
+}
+
+function parseLocal(text) {
+  var existing = places.map(function(p){return p.name.toLowerCase();});
+  var lines = text.split('\n');
+  var results = [];
+  var seenNames = {};
+
+  lines.forEach(function(line) {
+    var clean = line.replace(/[^\x20-\x7E\xA0-\xFF\u0100-\u024F]/g, ' ').trim();
+    if (!clean || clean.length < 3) return;
+    var m = clean.match(/^\s*(?:[-*]|\d+[\.\)])\s*(.+)/);
+    var content = m ? m[1] : clean;
+    var nameMatch = content.match(/^([^:(]+?)(?:\s*[\(:](.*))?$/);
+    if (!nameMatch) return;
+    var rawName = nameMatch[1].replace(/\s+/g,' ').trim();
+    if (rawName.length < 3 || rawName.length > 80) return;
+    if (/^(ruta|dia |barrio|ideal para|parada |texto |marcas |barrios )/i.test(rawName)) return;
+    var afterName = nameMatch[2] || '';
+    var fullLine = rawName + ' ' + afterName;
+    var zone = guessZone(fullLine);
+    var cat = guessCat(rawName, fullLine);
+    var note = afterName.replace(/[\(\)]/g,'').trim();
+    var addrMatch = note.match(/^[\d\w\s]+(?:st|ave?|blvd|plaza|rd|way)\b[^:]*:\s*/i);
+    if (addrMatch) note = note.substring(addrMatch[0].length).trim();
+    if (note.length > 120) note = note.substring(0, 117) + '...';
+    var key = rawName.toLowerCase();
+    if (seenNames[key]) return;
+    seenNames[key] = true;
+    var isDup = existing.some(function(n){return sim(n,rawName)>0.75;});
+    results.push({id:Date.now()+Math.random(),name:rawName,zone:zone,cat:cat,notes:note,isDup:isDup});
+  });
+
+  return results;
+}
+
+function extractFromText() {
+  var text = document.getElementById('import-text').value.trim();
+  if (!text) { toast('Pega algun texto primero'); return; }
+  var btn = document.getElementById('extract-btn');
+  btn.disabled = true; btn.textContent = 'Analizando...';
+  var prog = document.getElementById('extract-progress');
+  var fill = document.getElementById('extract-fill');
+  prog.style.display = 'block'; fill.style.width = '30%';
+  var existing = places.map(function(p){return p.name.toLowerCase();});
+  var prompt = 'Extrae todos los sitios, tiendas, restaurantes y lugares de Nueva York del siguiente texto.\n\n'+
+    'Escribe UNA linea por sitio con este formato separado por pipe |:\n'+
+    'NOMBRE|ZONA|CATEGORIA|NOTA\n\n'+
+    'Reglas:\n'+
+    '- ZONA: manhattan, brooklyn, queens, bronx o staten\n'+
+    '- CATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\n'+
+    '- NOTA: frase corta o vacia\n'+
+    '- Solo las lineas de datos, sin numeracion ni explicaciones previas\n\n'+
+    'Ejemplo de salida:\n'+
+    'Harry Potter New York|manhattan|compras|tienda enorme cerveza mantequilla\n'+
+    'NBA Store|manhattan|compras|tres plantas\n'+
+    'Central Park|manhattan|parque|\n\n'+
+    'TEXTO:\n'+text;
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data) {
+    fill.style.width = '90%';
+    if (data.error) throw new Error(data.error.message);
+    var raw = (data.content||[]).map(function(b){return b.text||'';}).join('');
+    var parsed = raw.split('\n')
+      .map(function(l){return l.trim();})
+      .filter(function(l){return l.indexOf('|')>-1;})
+      .map(function(l) {
+        var parts = l.split('|').map(function(p){return p.replace(/^\d+[\.\)]\s*/,'').replace(/^[-*]\s*/,'').trim();});
+        var name = parts[0]; if (!name||name.length<2) return null;
+        var zone = VZ.filter(function(z){return (parts[1]||'').toLowerCase().indexOf(z)>-1;})[0]||'manhattan';
+        var cat = VC.filter(function(c){return (parts[2]||'').toLowerCase().indexOf(c)>-1;})[0]||'otro';
+        var notes = parts[3]||'';
+        var isDup = existing.some(function(n){return sim(n,name)>0.75;});
+        return {id:Date.now()+Math.random(),name:name,zone:zone,cat:cat,notes:notes,isDup:isDup};
+      })
+      .filter(function(x){return x!==null;});
+    extracted = parsed;
+    renderExtracted();
+    toast('IA: '+extracted.length+' sitios detectados');
+    setTimeout(function(){prog.style.display='none'; fill.style.width='0';},500);
+  })
+  .catch(function(err) {
+    fill.style.width = '60%';
+    var local = parseLocal(text);
+    if (local.length > 0) {
+      extracted = local;
+      renderExtracted();
+      toast('Modo local: '+local.length+' sitios detectados');
+    } else {
+      document.getElementById('extracted-results').innerHTML=
+        '<div style="color:var(--accent);font-size:0.85rem;padding:10px;line-height:1.6">'+
+        'No se pudo conectar con la IA y el parser local no detecto sitios.<br>'+
+        'Prueba a pegar texto con listas numeradas o con vietas.</div>';
+    }
+    prog.style.display='none'; fill.style.width='0';
+  })
+  .finally(function() { btn.disabled=false; btn.textContent='Analizar con IA'; });
+}
+
+function renderExtracted() {
+  var newOnes = extracted.filter(function(p){return !p.isDup;});
+  var dups = extracted.filter(function(p){return p.isDup;});
+  if (!extracted.length) {
+    document.getElementById('extracted-results').innerHTML='<div class="empty">No se detectaron sitios.</div>';
+    document.getElementById('import-summary').style.display='none';
+    document.getElementById('import-actions').style.display='none';
+    return;
+  }
+  document.getElementById('extracted-results').innerHTML =
+    '<div class="extracted-list">'+
+    extracted.map(function(p){
+      return '<div class="ext-item '+(p.isDup?'ext-dup':'ext-new')+'">'+
+        '<div class="ext-name">'+esc(p.name)+
+          '<span class="ext-badge '+(p.isDup?'badge-dup':'badge-new')+'">'+(p.isDup?'ya existe':'nuevo')+'</span>'+
+        '</div>'+
+        '<div style="font-size:0.75rem;color:#666;margin-top:3px">'+
+          '<span class="zone-badge z-'+p.zone+'">'+ZL[p.zone]+'</span> '+p.cat+
+        '</div>'+
+        (p.notes?'<div style="font-size:0.75rem;color:#666;margin-top:3px">'+esc(p.notes)+'</div>':'')+
+      '</div>';
+    }).join('')+'</div>';
+  var sum = document.getElementById('import-summary');
+  sum.style.display='block';
+  sum.innerHTML = extracted.length+' detectados &nbsp;|&nbsp; '+
+    '<span style="color:var(--green)">'+newOnes.length+' nuevos</span> &nbsp;|&nbsp; '+
+    '<span style="color:#E67E22">'+dups.length+' duplicados</span>';
+  var act = document.getElementById('import-actions');
+  if (newOnes.length>0) {
+    act.style.display='flex';
+    document.getElementById('confirm-btn').textContent='Anadir '+newOnes.length+' nuevo'+(newOnes.length!==1?'s':'');
+  } else {
+    act.style.display='none';
+  }
+}
+
+function confirmImport() {
+  var newOnes = extracted.filter(function(p){return !p.isDup;});
+  newOnes.forEach(function(p){
+    var np = {id:Date.now()+Math.random(),name:p.name,zone:p.zone,cat:p.cat,notes:p.notes,who:'Importado',votes:0};
+    enrichPlace(np);
+    places.push(np);
+  });
+  save(); render(); clearExtracted();
+  document.getElementById('import-text').value='';
+  toast(newOnes.length+' sitios anadidos');
+  switchTab('places',document.querySelectorAll('.tab-btn')[0]);
+}
+
+function clearExtracted() {
+  extracted=[];
+  document.getElementById('extracted-results').innerHTML='<div class="empty">Los sitios detectados apareceran aqui.<br><br><span style="color:var(--green)">Verde = nuevo</span><br><span style="color:#E67E22">Naranja = ya existe</span></div>';
+  document.getElementById('import-summary').style.display='none';
+  document.getElementById('import-actions').style.display='none';
+}
+
+function clearImport() {
+  document.getElementById('import-text').value='';
+  clearExtracted();
+}
+
+function buildLocalItinerary(days, pace, prio, dateVal) {
+  var maxPerDay = pace === 'relajado' ? 3 : pace === 'normal' ? 5 : 7;
+  var sorted = places.slice();
+
+  if (prio === 'votos') {
+    sorted.sort(function(a,b){ return b.votes - a.votes; });
+  } else if (prio === 'ninos') {
+    var kidCats = { museo:3, parque:3, actividad:3, foto:2, cultura:1, compras:1, restaurante:1, transporte:0, otro:0 };
+    sorted.sort(function(a,b){
+      var sa = (kidCats[a.cat]||0) + a.votes;
+      var sb = (kidCats[b.cat]||0) + b.votes;
+      return sb - sa;
+    });
+  }
+
+  if (prio === 'zona') {
+    var zoneGroups = {};
+    VZ.forEach(function(z){ zoneGroups[z] = []; });
+    sorted.forEach(function(p){ if(zoneGroups[p.zone]) zoneGroups[p.zone].push(p); });
+    var dayPlan = [];
+    var dayNum = 0;
+    VZ.forEach(function(z) {
+      var items = zoneGroups[z];
+      if (!items.length) return;
+      items.sort(function(a,b){ return b.votes - a.votes; });
+      for (var i = 0; i < items.length; i += maxPerDay) {
+        if (dayNum >= days) break;
+        dayPlan.push({ zone: z, items: items.slice(i, i + maxPerDay) });
+        dayNum++;
+      }
+    });
+    return dayPlan.slice(0, days);
+  }
+
+  var dayPlan = [];
+  var used = 0;
+  for (var d = 0; d < days; d++) {
+    var batch = sorted.slice(used, used + maxPerDay);
+    if (!batch.length) break;
+    var zoneCounts = {};
+    batch.forEach(function(p){ zoneCounts[p.zone] = (zoneCounts[p.zone]||0) + 1; });
+    var mainZone = 'manhattan';
+    var maxC = 0;
+    for (var z in zoneCounts) { if (zoneCounts[z] > maxC) { maxC = zoneCounts[z]; mainZone = z; } }
+    dayPlan.push({ zone: mainZone, items: batch });
+    used += maxPerDay;
+  }
+  return dayPlan;
+}
+
+function renderLocalItin(dayPlan, dateVal, pace) {
+  var dayNames = ['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+  var startDate = dateVal ? new Date(dateVal + 'T12:00:00') : null;
+  var html = '';
+
+  dayPlan.forEach(function(day, i) {
+    var title = 'DIA ' + (i+1);
+    if (startDate) {
+      var d = new Date(startDate.getTime() + i * 86400000);
+      title += ' - ' + dayNames[d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth()+1);
+    }
+    title += ' -- Zona: ' + ZL[day.zone];
+
+    var items = day.items;
+    var routeUrl = mapsRouteUrl(items);
+
+    html += '<div class="day-block"><h3>'+esc(title)+'</h3><ul>';
+
+    items.forEach(function(p, j) {
+      var period = j < Math.ceil(items.length / 2) ? 'Manana' : 'Tarde';
+      var mu = mapsUrl(p.name, p.addr, p.lat, p.lng);
+      html += '<li><strong>'+period+':</strong> '+esc(p.name)+
+        ' <span style="color:#555;font-size:0.75rem">('+p.cat+', '+p.votes+' votos)</span>'+
+        (p.addr?'<div class="place-addr">'+esc(p.addr)+'</div>':'')+
+        (p.notes?'<div style="color:#666;font-size:0.78rem">'+esc(p.notes)+'</div>':'')+
+        '<a class="maps-link" href="'+mu+'" target="_blank" rel="noopener">Ver en Maps</a>'+
+        '</li>';
+    });
+
+    var tip = '';
+    if (pace === 'relajado') {
+      tip = 'Dejar tiempo libre entre sitios para descanso de los mas pequenos';
+    } else if (day.zone === 'manhattan') {
+      tip = 'Combinar metro + caminar. Los ninos pequenos aguantan mejor en tramos cortos';
+    } else {
+      tip = 'Llevar snacks y agua. Planificar paradas para descansar';
+    }
+    html += '<li style="color:#666;font-style:italic;border:none">Consejo: '+tip+'</li>';
+    html += '</ul>';
+
+    if (routeUrl) {
+      html += '<a class="maps-route" href="'+routeUrl+'" target="_blank" rel="noopener">Abrir ruta del dia en Google Maps</a>';
+    }
+    html += '</div>';
+  });
+
+  document.getElementById('itin-output').innerHTML = html || '<div class="empty">No hay suficientes sitios para generar el itinerario.</div>';
+}
+
+function generateItinerary() {
+  if (!places.length) { toast('Anade sitios primero'); return; }
+  var days = parseInt(document.getElementById('cfg-days').value)||5;
+  var pace = document.getElementById('cfg-pace').value;
+  var prio = document.getElementById('cfg-prio').value;
+  var dateVal = document.getElementById('cfg-date').value;
+  var btn = document.getElementById('gen-btn');
+  btn.disabled=true; btn.textContent='Generando...';
+  var out = document.getElementById('itin-output');
+  out.innerHTML='<div class="empty">Pensando el itinerario para el grupo...</div>';
+  var pt = places.slice().sort(function(a,b){return b.votes-a.votes;})
+    .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.cat+', '+p.votes+' votos'+(p.notes?', '+p.notes:'')+')';}).join('\n');
+  var pr = prio==='votos'?'priorizar los mas votados':prio==='ninos'?'priorizar aptos para ninos':'agrupar por zona geografica';
+  var prompt = 'Eres experto en viajes familiares a Nueva York. Grupo: 8 adultos y 8 ninos de 5 a 15 anos.\n'+
+    'Viaje: '+days+' dias, ritmo '+pace+', prioridad: '+pr+'.\n\n'+
+    'Sitios propuestos:\n'+pt+'\n\n'+
+    'Genera itinerario dia a dia'+(dateVal?' desde el '+dateVal:'')+'. Cada dia: zona principal, sitios en orden logico manana-tarde-noche, 1-2 consejos para grupo con ninos. Encabezados DIA 1, DIA 2, etc. En espanol, conciso.';
+
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if (data.error) throw new Error(data.error.message);
+    var text=(data.content||[]).map(function(b){return b.text||'';}).join('');
+    renderItin(text);
+    toast('Itinerario generado con IA');
+  })
+  .catch(function(err){
+    var dayPlan = buildLocalItinerary(days, pace, prio, dateVal);
+    if (dayPlan.length > 0) {
+      renderLocalItin(dayPlan, dateVal, pace);
+      toast('Itinerario generado (modo local)');
+    } else {
+      out.innerHTML='<div style="color:var(--accent);padding:20px">No se pudo generar el itinerario. Anade mas sitios e intentalo de nuevo.</div>';
+    }
+  })
+  .finally(function(){btn.disabled=false; btn.textContent='Generar con IA';});
+}
+
+function renderItin(text) {
+  var lines=text.split('\n').filter(function(l){return l.trim();});
+  var html='',dt='',dl=[];
+  function flush(){
+    if(dt){html+='<div class="day-block"><h3>'+esc(dt)+'</h3><ul>'+dl.map(function(l){return '<li>'+esc(l)+'</li>';}).join('')+'</ul></div>';dt='';dl=[];}
+  }
+  lines.forEach(function(line){
+    var t=line.trim();
+    if(/^D[IA][A]?\s*\d+/i.test(t)){flush();dt=t;}
+    else if(dt){dl.push(t.replace(/^[-*]\s*/,''));}
+    else{html+='<p style="color:#777;font-size:0.85rem;margin-bottom:8px">'+esc(t)+'</p>';}
+  });
+  flush();
+  document.getElementById('itin-output').innerHTML=html||'<div class="empty">'+esc(text)+'</div>';
+}
+
+function toast(msg) {
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},2500);
+}
+
+load(); render();
+try{document.getElementById('cfg-date').valueAsDate=new Date();}catch(e){}
+
+// Show sync status
+var syncEl = document.getElementById('sync-status');
+if (fbReady) {
+  fbDb.ref('.info/connected').on('value', function(snap) {
+    if (snap.val() === true) {
+      syncEl.innerHTML = '<span class="sync-dot online"></span>';
+    } else {
+      syncEl.innerHTML = '<span class="sync-dot offline"></span>';
+    }
+  });
+} else {
+  syncEl.innerHTML = '<span class="sync-dot offline"></span>';
+}
+</script>
+</body>
+</html>
