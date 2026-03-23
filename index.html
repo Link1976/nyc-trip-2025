@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>NYC Trip Grupo 2025</title>
+<title>NYC Trip Grupo 2026</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -263,7 +263,7 @@
 <body>
 
 <header>
-  <div class="logo">NYC<span class="dot">.</span>Trip<span class="sub">2025</span></div>
+  <div class="logo">NYC<span class="dot">.</span>Trip<span class="sub">2026</span></div>
   <div class="header-meta"><span id="sync-status"></span>8 adultos &middot; 8 ninos</div>
 </header>
 
@@ -435,7 +435,7 @@ function catToTag(cat) {
 
 // Trip dates: March 28 - April 4, 2026
 var TRIP_DAYS = (function() {
-  var days = []; var d = new Date('2026-03-28');
+  var days = []; var d = new Date('2026-03-28T12:00:00');
   var labels = ['Vi','Sa','Do','Lu','Ma','Mi','Ju'];
   for (var i = 0; i < 8; i++) {
     var key = d.toISOString().slice(0,10);
