@@ -313,12 +313,14 @@
 <!-- API Key Panel -->
 <div id="api-panel" onclick="if(event.target===this)toggleApiPanel()">
   <div class="api-panel-box">
-    <div class="api-panel-title">&#9881; Configurar Claude API Key</div>
+    <div class="api-panel-title">&#9881; Configurar Google Gemini API Key</div>
     <div class="api-panel-hint">
-      Necesaria para buscar sitios con IA, analizar capturas e importar itinerarios.<br>
-      Tu clave se guarda solo en este dispositivo (localStorage). Obtenla en <strong>console.anthropic.com</strong>.
+      Opcional. Mejora la busqueda de sitios, analiza capturas y genera itinerarios.<br>
+      <strong>Gratis</strong> en el tier gratuito de Google AI Studio (15 llamadas/min, sin tarjeta).<br>
+      Obtenla en <strong>aistudio.google.com</strong> → Get API key.<br>
+      Se guarda solo en este dispositivo.
     </div>
-    <input type="password" id="api-key-input" class="api-panel-input" placeholder="sk-ant-api03-..." autocomplete="off" />
+    <input type="password" id="api-key-input" class="api-panel-input" placeholder="AIza..." autocomplete="off" />
     <div class="api-panel-btns">
       <button class="btn btn-outline btn-inline" onclick="toggleApiPanel()">Cancelar</button>
       <button class="btn" onclick="saveApiKey()">Guardar</button>
@@ -564,8 +566,9 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ── API Key helpers ────────────────────────────────────────────────────────────
-var API_KEY_SK = 'nyc_claude_api_key';
+// ── API Key helpers (Google Gemini — tier gratuito) ───────────────────────────
+var API_KEY_SK = 'nyc_gemini_api_key';
+var GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=';
 
 function getApiKey() {
   return localStorage.getItem(API_KEY_SK) || '';
@@ -595,12 +598,42 @@ function saveApiKey() {
   document.getElementById('api-panel').classList.remove('open');
 }
 
-function _apiHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    'anthropic-dangerous-direct-browser-access': 'true',
-    'x-api-key': getApiKey()
-  };
+function _geminiText(data) {
+  return ((data.candidates || [])[0] || {content:{parts:[]}}).content.parts
+    .map(function(p){return p.text||'';}).join('');
+}
+
+function callGemini(prompt) {
+  var key = getApiKey();
+  if (!key) return Promise.reject(new Error('Sin API key'));
+  return fetch(GEMINI_URL + key, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({contents:[{parts:[{text: prompt}]}]})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if (data.error) throw new Error(data.error.message);
+    return _geminiText(data);
+  });
+}
+
+function callGeminiVision(base64data, mimeType, prompt) {
+  var key = getApiKey();
+  if (!key) return Promise.reject(new Error('Sin API key'));
+  return fetch(GEMINI_URL + key, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({contents:[{parts:[
+      {inline_data:{mime_type: mimeType, data: base64data}},
+      {text: prompt}
+    ]}]})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if (data.error) throw new Error(data.error.message);
+    return _geminiText(data);
+  });
 }
 
 var SK = 'nyc_trip_v3';
@@ -772,7 +805,36 @@ var NYC_DB = {
   'new york public library main branch': {addr:'476 5th Ave, New York, NY 10018',lat:40.7532,lng:-73.9822,cat:'cultura',zone:'manhattan',desc:'Biblioteca publica con leones de marmol y salas impresionantes',tags:'biblioteca leones gratis arquitectura cultura exposicion midtown'},
   'morningside park': {addr:'Morningside Ave, New York, NY 10027',cat:'parque',zone:'manhattan',desc:'Parque tranquilo cerca de Columbia University',tags:'parque harlem tranquilo naturaleza'},
   'isamu noguchi museum': {addr:'9-01 33rd Rd, Long Island City, NY 11106',lat:40.7694,lng:-73.9384,cat:'museo',zone:'queens',desc:'Museo y jardín del escultor Noguchi en Long Island City',tags:'museo escultura arte japones jardin queens'},
-  'moma ps1': {addr:'22-25 Jackson Ave, Long Island City, NY 11101',lat:40.7449,lng:-73.9467,cat:'museo',zone:'queens',desc:'Sucursal del MoMA con arte contemporaneo experimental',tags:'museo arte contemporaneo experimental queens moma'}
+  'moma ps1': {addr:'22-25 Jackson Ave, Long Island City, NY 11101',lat:40.7449,lng:-73.9467,cat:'museo',zone:'queens',desc:'Sucursal del MoMA con arte contemporaneo experimental',tags:'museo arte contemporaneo experimental queens moma'},
+
+  // Restaurantes adicionales
+  "lombardi's pizza": {addr:'32 Spring St, New York, NY 10012',lat:40.7222,lng:-73.9963,cat:'restaurante',zone:'manhattan',desc:'La primera pizzeria de EEUU desde 1905, horno de carbon',tags:'pizza restaurante italiana historico clasico primera soho nolita'},
+  "juliana's pizza": {addr:'1 Front St, Brooklyn, NY 11201',lat:40.7027,lng:-73.9939,cat:'restaurante',zone:'brooklyn',desc:'Pizza de horno de carbon bajo el Brooklyn Bridge, DUMBO',tags:'pizza restaurante italiana dumbo brooklyn horno carbon'},
+  "roberta's pizza": {addr:'261 Moore St, Brooklyn, NY 11206',lat:40.7055,lng:-73.9330,cat:'restaurante',zone:'brooklyn',desc:'Pizzeria napolitana de culto en Bushwick',tags:'pizza restaurante italiana brooklyn bushwick moderna'},
+  'prince street pizza': {addr:'27 Prince St, New York, NY 10012',lat:40.7228,lng:-73.9961,cat:'restaurante',zone:'manhattan',desc:'Pizza siciliana cuadrada y crujiente, famosa en NYC',tags:'pizza restaurante italiana soho nolita siciliana cuadrada'},
+  "ellen's stardust diner": {addr:'1650 Broadway, New York, NY 10019',lat:40.7632,lng:-73.9847,cat:'restaurante',zone:'manhattan',desc:'Diner americano cuyos camareros cantan Broadway, ideal para ninos',tags:'restaurante diner ninos broadway musica americano divertido cantantes midtown'},
+  'serendipity 3': {addr:'225 E 60th St, New York, NY 10022',lat:40.7618,lng:-73.9659,cat:'restaurante',zone:'manhattan',desc:'Heladeria famosa con copas gigantes, icono de NYC para ninos',tags:'restaurante helado postre ninos famoso iconico dulce upper east side'},
+  'halal guys': {addr:'53rd St & 6th Ave, New York, NY 10019',lat:40.7617,lng:-73.9808,cat:'restaurante',zone:'manhattan',desc:'Carro de comida halal mas famoso de NYC, pollo y arroz',tags:'restaurante carro halal pollo arroz comida rapida barato iconico midtown'},
+  "sylvia's restaurant": {addr:'328 Lenox Ave, New York, NY 10027',lat:40.8055,lng:-73.9467,cat:'restaurante',zone:'manhattan',desc:'Soul food en Harlem, legendario desde 1962',tags:'restaurante soul food harlem americano historico legendario pollo'},
+  'ippudo ny': {addr:'321 W 51st St, New York, NY 10019',lat:40.7630,lng:-73.9895,cat:'restaurante',zone:'manhattan',desc:'Ramen japones de fama mundial, cola habitual',tags:'restaurante ramen japones sopa fideos asiatico midtown'},
+  "xi'an famous foods": {addr:'81 St Marks Pl, New York, NY 10003',lat:40.7272,lng:-73.9861,cat:'restaurante',zone:'manhattan',desc:'Fideos y cocina del noroeste de China, barato y famoso',tags:'restaurante chino fideos asiatico barato east village especiado'},
+  'momofuku noodle bar': {addr:'171 1st Ave, New York, NY 10003',lat:40.7273,lng:-73.9823,cat:'restaurante',zone:'manhattan',desc:'Ramen y cocina asiatica fusion de David Chang',tags:'restaurante ramen asiatico fusion noodle east village moderno'},
+  'nom wah tea parlor': {addr:'13 Doyers St, New York, NY 10013',lat:40.7155,lng:-73.9992,cat:'restaurante',zone:'manhattan',desc:'Dim sum y dumplings en Chinatown desde 1920',tags:'restaurante chino dim sum dumplings chinatown historico asiatico'},
+  "russ and daughters": {addr:'179 E Houston St, New York, NY 10002',lat:40.7222,lng:-73.9873,cat:'restaurante',zone:'manhattan',desc:'Delicatessen de salmon ahumado y bagels desde 1914',tags:'restaurante bagel salmon delicatessen desayuno brunch historico lower east side judio'},
+  'balthazar': {addr:'80 Spring St, New York, NY 10012',lat:40.7236,lng:-73.9972,cat:'restaurante',zone:'manhattan',desc:'Brasserie francesa clasica en SoHo, brunch iconico',tags:'restaurante frances brasserie brunch desayuno clasico soho romantico'},
+  'sarabeth s': {addr:'423 Amsterdam Ave, New York, NY 10024',lat:40.7831,lng:-73.9784,cat:'restaurante',zone:'manhattan',desc:'Brunch clasico de NYC, famoso por las mermeladas',tags:'restaurante brunch desayuno americano clasico upper west side familiar'},
+  'veselka': {addr:'144 2nd Ave, New York, NY 10003',lat:40.7271,lng:-73.9877,cat:'restaurante',zone:'manhattan',desc:'Diner ucraniano 24 horas, clasico del East Village',tags:'restaurante diner 24h east village barato desayuno brunch nocturno ucraniano'},
+  'artichoke pizza': {addr:'321 E 14th St, New York, NY 10003',lat:40.7318,lng:-73.9833,cat:'restaurante',zone:'manhattan',desc:'Pizza de alcachofa y cangrejo, famosa en NYC',tags:'pizza restaurante italiana east village noche alcachofa'},
+  'dos toros taqueria': {addr:'137 4th Ave, New York, NY 10003',lat:40.7316,lng:-73.9896,cat:'restaurante',zone:'manhattan',desc:'Burritos estilo San Francisco, rapido y barato',tags:'restaurante mexicano burrito tacos rapido barato'},
+  "zabar's": {addr:'2245 Broadway, New York, NY 10024',lat:40.7829,lng:-73.9813,cat:'compras',zone:'manhattan',desc:'Delicatessen y tienda gourmet emblematica del Upper West Side',tags:'tienda comida gourmet deli desayuno bagel upper west side emblematico'},
+  'gallagher s steakhouse': {addr:'228 W 52nd St, New York, NY 10019',lat:40.7624,lng:-73.9854,cat:'restaurante',zone:'manhattan',desc:'Steakhouse clasico de NYC desde 1927, carne madurada a la vista',tags:'restaurante carne steak clasico historico midtown americana'},
+  'junior s cheesecake': {addr:'386 Flatbush Ave Ext, Brooklyn, NY 11201',lat:40.6907,lng:-73.9855,cat:'restaurante',zone:'brooklyn',desc:'El mejor cheesecake de NYC desde 1950',tags:'restaurante postre cheesecake tarta queso brooklyn famoso clasico'},
+  'clinton street baking': {addr:'4 Clinton St, New York, NY 10002',lat:40.7193,lng:-73.9853,cat:'restaurante',zone:'manhattan',desc:'Pancakes y brunch de culto en Lower East Side',tags:'restaurante brunch desayuno pancakes americano lower east side cola'},
+  'tacombi': {addr:'267 Elizabeth St, New York, NY 10012',lat:40.7233,lng:-73.9955,cat:'restaurante',zone:'manhattan',desc:'Tacos mexicanos en un volkswagen vintage, nolita',tags:'restaurante mexicano tacos vintage nolita ambiente'},
+  'the standard grill': {addr:'848 Washington St, New York, NY 10014',lat:40.7405,lng:-74.0081,cat:'restaurante',zone:'manhattan',desc:'Restaurante moderno debajo del High Line',tags:'restaurante americano moderno meatpacking high line terraza'},
+  'blue smoke': {addr:'255 Vesey St, New York, NY 10282',lat:40.7148,lng:-74.0161,cat:'restaurante',zone:'manhattan',desc:'Barbacoa americana estilo sur, costillas y pulled pork',tags:'restaurante bbq barbacoa americana costillas cerdo sur'},
+  'parm': {addr:'248 Mulberry St, New York, NY 10012',lat:40.7220,lng:-73.9966,cat:'restaurante',zone:'manhattan',desc:'Sandwich de parmigiana y comida italiana familiar',tags:'restaurante italiano sandwich parmigiana nolita familiar'},
+  'gene s chinese': {addr:'15 Mott St, New York, NY 10013',lat:40.7151,lng:-73.9979,cat:'restaurante',zone:'manhattan',desc:'Dim sum clasico en Chinatown',tags:'restaurante chino dim sum chinatown clasico asiatico'}
 };
 
 // Search aliases: maps common search terms to NYC_DB keys
@@ -859,15 +921,48 @@ var SEARCH_ALIASES = {
   'bowling':'chelsea piers',
   'tenis':'chelsea piers',
   'deportivo':'chelsea piers madison square garden',
-  'chinatown':'chinatown',
-  'chino':'chinatown',
-  'italiano':'little italy katz delicatessen eataly nyc',
-  'soho':'soho kith manhattan saturdays nyc moma design store',
-  'nolita':'nolita aime leon dore noah',
-  'meatpacking':'meatpacking district whitney museum',
+  'chinatown':'chinatown nom wah tea parlor gene s chinese',
+  'chino':'chinatown nom wah tea parlor xi\'an famous foods gene s chinese',
+  'italiano':'little italy katz delicatessen eataly nyc lombardi\'s pizza balthazar parm',
+  'soho':'soho kith manhattan saturdays nyc moma design store lombardi\'s pizza balthazar prince street pizza',
+  'nolita':'nolita aime leon dore noah prince street pizza tacombi parm',
+  'meatpacking':'meatpacking district whitney museum the standard grill',
   'brooklyn bridge park':'brooklyn bridge park',
   'battery park':'battery park',
-  'vistas':'top of the rock empire state building one world observatory edge observation deck summit one vanderbilt brooklyn bridge park battery park governors island'
+  'vistas':'top of the rock empire state building one world observatory edge observation deck summit one vanderbilt brooklyn bridge park battery park governors island',
+  'restaurante':'shake shack katz delicatessen joes pizza los tacos no 1 levain bakery chelsea market eataly nyc di fara pizza ellen\'s stardust diner serendipity 3',
+  'brunch':'balthazar sarabeth s clinton street baking veselka russ and daughters',
+  'desayuno':'levain bakery russ and daughters clinton street baking sarabeth s zabar\'s',
+  'bagel':'russ and daughters zabar\'s',
+  'ramen':'ippudo ny momofuku noodle bar xi\'an famous foods',
+  'fideos':'ippudo ny momofuku noodle bar xi\'an famous foods',
+  'japones':'ippudo ny momofuku noodle bar',
+  'asiatico':'chinatown nom wah tea parlor xi\'an famous foods ippudo ny momofuku noodle bar gene s chinese',
+  'dim sum':'nom wah tea parlor gene s chinese chinatown',
+  'dumplings':'nom wah tea parlor xi\'an famous foods chinatown',
+  'tacos':'los tacos no 1 tacombi dos toros taqueria',
+  'mexicano':'los tacos no 1 tacombi dos toros taqueria',
+  'burrito':'dos toros taqueria los tacos no 1',
+  'carne':'peter luger steak house gallagher s steakhouse katz delicatessen blue smoke',
+  'steak':'peter luger steak house gallagher s steakhouse',
+  'steakhouse':'peter luger steak house gallagher s steakhouse',
+  'bbq':'blue smoke',
+  'barbacoa':'blue smoke',
+  'halal':'halal guys',
+  'pollo':'halal guys sylvia\'s restaurant ellen\'s stardust diner',
+  'soul food':'sylvia\'s restaurant',
+  'harlem restaurante':'sylvia\'s restaurant apollo theater',
+  'cheesecake':'junior s cheesecake',
+  'diner':'ellen\'s stardust diner veselka',
+  'helado restaurante':'serendipity 3 museum of ice cream',
+  'postre':'serendipity 3 levain bakery junior s cheesecake',
+  'barato':'halal guys xi\'an famous foods dos toros taqueria veselka joes pizza',
+  'economico':'halal guys xi\'an famous foods dos toros taqueria veselka',
+  'ninos restaurante':'ellen\'s stardust diner serendipity 3 shake shack joes pizza',
+  'familiar':'ellen\'s stardust diner serendipity 3 shake shack junior s cheesecake',
+  'frances':'balthazar',
+  'salmon':'russ and daughters',
+  'deli':'katz delicatessen russ and daughters zabar\'s'
 };
 
 function findInDB(name) {
@@ -1116,8 +1211,42 @@ function searchPlaces() {
   document.getElementById('search-confirm').style.display = 'none';
   selectedResult = null;
 
-  var existing = places.map(function(p) { return p.name.toLowerCase(); });
+  // ── Try local DB first (free, instant) ───────────────────────────────────────
+  var localResults = searchLocal(query);
+  if (localResults.length >= 3) {
+    fill.style.width = '100%';
+    searchResults = localResults;
+    renderSearchResults();
+    toast(localResults.length + ' sitios encontrados');
+    btn.disabled = false; btn.textContent = 'Buscar';
+    setTimeout(function(){ prog.style.display='none'; fill.style.width='0'; }, 400);
+    return;
+  }
 
+  // Show local results while we try Gemini
+  if (localResults.length > 0) {
+    searchResults = localResults;
+    renderSearchResults();
+  }
+
+  // ── Try Gemini if key is configured ──────────────────────────────────────────
+  if (!getApiKey()) {
+    fill.style.width = '100%';
+    if (localResults.length > 0) {
+      toast(localResults.length + ' sitios encontrados');
+    } else {
+      document.getElementById('search-results').innerHTML =
+        '<div style="color:#888;font-size:0.82rem;padding:12px 0;line-height:1.6">' +
+        'No se encontraron sitios para "<strong>' + esc(query) + '</strong>".<br>' +
+        'Prueba con: museo, pizza, ramen, parque, ninos, mirador, shopping...<br>' +
+        'O configura Gemini IA (gratis) con el boton &#9881; para busquedas libres.</div>';
+    }
+    btn.disabled = false; btn.textContent = 'Buscar';
+    setTimeout(function(){ prog.style.display='none'; fill.style.width='0'; }, 400);
+    return;
+  }
+
+  var existing = places.map(function(p) { return p.name.toLowerCase(); });
   var prompt = 'Busca sitios reales de Nueva York que coincidan con: "' + query + '"\n\n' +
     'Devuelve entre 3 y 6 resultados. Escribe UNA linea por sitio con este formato pipe-delimited:\n' +
     'NOMBRE|ZONA|CATEGORIA|DIRECCION|DESCRIPCION_CORTA\n\n' +
@@ -1133,16 +1262,10 @@ function searchPlaces() {
     'Central Park Zoo|manhattan|actividad|64th St and 5th Ave, New York|Zoo pequeno ideal para ninos\n' +
     'Shake Shack Madison Square|manhattan|restaurante|Madison Square Park, New York|Hamburguesas iconicas al aire libre';
 
-  fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: _apiHeaders(),
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
+  fill.style.width = '60%';
+  callGemini(prompt)
+  .then(function(raw) {
     fill.style.width = '90%';
-    if (data.error) throw new Error(data.error.message);
-    var raw = (data.content || []).map(function(b) { return b.text || ''; }).join('');
     var parsed = raw.split('\n')
       .map(function(l) { return l.trim(); })
       .filter(function(l) { return l.indexOf('|') > -1; })
@@ -1157,22 +1280,25 @@ function searchPlaces() {
         return { name: name, zone: zone, cat: cat, addr: addr, desc: desc, isDup: isDup };
       })
       .filter(function(x) { return x !== null; });
-
-    searchResults = parsed;
+    // Merge with local results (avoid duplicates)
+    var combined = localResults.slice();
+    parsed.forEach(function(r) {
+      if (!combined.some(function(c){ return sim(c.name.toLowerCase(), r.name.toLowerCase()) > 0.7; })) {
+        combined.push(r);
+      }
+    });
+    searchResults = combined;
     renderSearchResults();
-    toast(parsed.length + ' sitios encontrados');
+    toast(searchResults.length + ' sitios encontrados');
   })
   .catch(function(err) {
-    var localResults = searchLocal(query);
     if (localResults.length > 0) {
-      searchResults = localResults;
-      renderSearchResults();
       toast(localResults.length + ' sitios encontrados');
     } else {
       document.getElementById('search-results').innerHTML =
         '<div style="color:#888;font-size:0.82rem;padding:12px 0;line-height:1.6">' +
         'No se encontraron sitios para "<strong>' + esc(query) + '</strong>".<br>' +
-        'Prueba con otra busqueda (ej: museo, pizza, ninos, parque, mirador...)</div>';
+        'Prueba con otra busqueda.</div>';
     }
   })
   .finally(function() {
@@ -1513,16 +1639,9 @@ function extractFromText() {
     'Central Park|manhattan|parque|\n\n'+
     'TEXTO:\n'+text;
 
-  fetch('https://api.anthropic.com/v1/messages', {
-    method:'POST',
-    headers:_apiHeaders(),
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})
-  })
-  .then(function(r){return r.json();})
-  .then(function(data) {
+  callGemini(prompt)
+  .then(function(raw) {
     fill.style.width = '90%';
-    if (data.error) throw new Error(data.error.message);
-    var raw = (data.content||[]).map(function(b){return b.text||'';}).join('');
     var parsed = raw.split('\n')
       .map(function(l){return l.trim();})
       .filter(function(l){return l.indexOf('|')>-1;})
@@ -1655,26 +1774,10 @@ function analyzeImage() {
   prog.style.display = 'block'; fill.style.width = '40%';
   var existing = places.map(function(p) { return p.name.toLowerCase(); });
 
-  fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: _apiHeaders(),
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: pendingImgType, data: pendingImgBase64 } },
-          { type: 'text', text: 'Extrae todos los nombres de lugares, restaurantes, tiendas y sitios turisticos de Nueva York que aparezcan en esta imagen. Devuelve UNA linea por sitio:\nNOMBRE|ZONA|CATEGORIA|NOTA\nZONA: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos, sin explicaciones ni numeracion.' }
-        ]
-      }]
-    })
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
+  callGeminiVision(pendingImgBase64, pendingImgType,
+    'Extrae todos los nombres de lugares, restaurantes, tiendas y sitios turisticos de Nueva York que aparezcan en esta imagen. Devuelve UNA linea por sitio:\nNOMBRE|ZONA|CATEGORIA|NOTA\nZONA: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos, sin explicaciones ni numeracion.')
+  .then(function(raw) {
     fill.style.width = '90%';
-    if (data.error) throw new Error(data.error.message);
-    var raw = (data.content||[]).map(function(b){return b.text||'';}).join('');
     var parsed = raw.split('\n').map(function(l){return l.trim();})
       .filter(function(l){return l.indexOf('|')>-1;})
       .map(function(l){
@@ -1728,20 +1831,10 @@ function importFromMaps() {
     }
   }
 
-  // Fallback: send URL to Claude to extract place names
+  // Fallback: send URL to Gemini to extract place names
   btn.disabled=true; btn.textContent='Analizando...';
-  fetch('https://api.anthropic.com/v1/messages', {
-    method:'POST',
-    headers:_apiHeaders(),
-    body:JSON.stringify({
-      model:'claude-sonnet-4-20250514', max_tokens:800,
-      messages:[{role:'user',content:'Esta es una URL de Google Maps compartida:\n'+url+'\n\nExtrae todos los nombres de lugares de Nueva York que puedas identificar. Devuelve UNA linea por sitio:\nNOMBRE|ZONA|CATEGORIA\nZONA: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos.'}]
-    })
-  })
-  .then(function(r){return r.json();})
-  .then(function(data){
-    if(data.error) throw new Error(data.error.message);
-    var raw=(data.content||[]).map(function(b){return b.text||'';}).join('');
+  callGemini('Esta es una URL de Google Maps compartida:\n'+url+'\n\nExtrae todos los nombres de lugares de Nueva York que puedas identificar. Devuelve UNA linea por sitio:\nNOMBRE|ZONA|CATEGORIA\nZONA: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos.')
+  .then(function(raw){
     var parsed=raw.split('\n').map(function(l){return l.trim();})
       .filter(function(l){return l.indexOf('|')>-1;})
       .map(function(l){
@@ -1930,15 +2023,8 @@ function generateItinerary() {
     'Sitios propuestos:\n'+pt+'\n\n'+
     'Genera itinerario dia a dia'+(dateVal?' desde el '+dateVal:'')+'. Para dias bloqueados muestra el plan fijo. Para el resto: zona principal, sitios en orden logico manana-tarde-noche, 1-2 consejos para grupo con ninos. Encabezados DIA 1, DIA 2, etc. En espanol, conciso.';
 
-  fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:_apiHeaders(),
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})
-  })
-  .then(function(r){return r.json();})
-  .then(function(data){
-    if (data.error) throw new Error(data.error.message);
-    var text=(data.content||[]).map(function(b){return b.text||'';}).join('');
+  callGemini(prompt)
+  .then(function(text){
     renderItin(text);
     toast('Itinerario generado con IA');
   })
