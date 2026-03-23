@@ -205,6 +205,25 @@
 
   .empty { text-align: center; padding: 40px 0; color: #333; font-size: 0.88rem; }
 
+  /* ── Tags ──────────────────────────────────────────────────────────────────── */
+  .tag-badge { font-size:0.62rem; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; padding:2px 8px; border-radius:4px; display:inline-block; cursor:pointer; margin-left:5px; transition:opacity 0.15s; }
+  .tag-badge:hover { opacity:0.75; }
+  .tag-turismo    { background:rgba(26,115,232,0.18); color:#6ab0ff; border:1px solid rgba(26,115,232,0.5); }
+  .tag-shopping   { background:rgba(155,89,182,0.18); color:#c07aff; border:1px solid rgba(155,89,182,0.5); }
+  .tag-restaurante{ background:rgba(230,126,34,0.18); color:#ff9f4a; border:1px solid rgba(230,126,34,0.5); }
+
+  /* ── Locked days ─────────────────────────────────────────────────────────── */
+  .lock-days-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .lock-pill { border:1px solid #3a3a3a; background:var(--mid); color:#666; border-radius:8px; padding:8px 10px; cursor:pointer; font-size:0.75rem; font-family:'DM Sans',sans-serif; text-align:center; min-width:78px; transition:all 0.2s; line-height:1.3; }
+  .lock-pill .pill-day { font-family:'Bebas Neue',sans-serif; font-size:1rem; display:block; }
+  .lock-pill:hover { border-color:#555; color:#aaa; }
+  .lock-pill.locked { background:rgba(247,231,51,0.12); border-color:var(--yellow); color:var(--yellow); }
+  .lock-pill.locked .pill-day { color:var(--yellow); }
+  .locked-editor { background:var(--mid); border:1px solid var(--yellow); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
+  .locked-editor-title { font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+  .day-block.is-locked { border-left-color: var(--accent); }
+  .day-block.is-locked h3 { color: var(--accent); }
+
   .search-box { display: flex; gap: 8px; margin-bottom: 6px; }
   .search-box input { flex: 1; }
   .search-box .btn { margin-top: 0; width: auto; min-width: 90px; flex-shrink: 0; }
@@ -283,13 +302,19 @@
       </div>
     </div>
 
-    <div class="filters">
+    <div class="filters" id="zone-filters">
       <button class="filter-btn active" onclick="setFilter('all',this)">Todos</button>
       <button class="filter-btn" onclick="setFilter('manhattan',this)">Manhattan</button>
       <button class="filter-btn" onclick="setFilter('brooklyn',this)">Brooklyn</button>
       <button class="filter-btn" onclick="setFilter('queens',this)">Queens</button>
       <button class="filter-btn" onclick="setFilter('bronx',this)">Bronx</button>
       <button class="filter-btn" onclick="setFilter('staten',this)">Staten I.</button>
+    </div>
+    <div class="filters" id="tag-filters" style="margin-top:-6px">
+      <button class="filter-btn active" onclick="setTagFilter('all',this)">&#9632; Todos</button>
+      <button class="filter-btn" onclick="setTagFilter('turismo',this)" style="color:#6ab0ff;border-color:#1A73E844">Turismo</button>
+      <button class="filter-btn" onclick="setTagFilter('shopping',this)" style="color:#c07aff;border-color:#9B59B644">Shopping</button>
+      <button class="filter-btn" onclick="setTagFilter('restaurante',this)" style="color:#ff9f4a;border-color:#E67E2244">Restaurante</button>
     </div>
 
     <div class="places-grid" id="places-grid"></div>
@@ -325,6 +350,13 @@
 
   <!-- ITINERARY -->
   <div id="tab-itinerary" class="tab-panel">
+    <div class="card">
+      <div class="card-title">Dias con plan fijo &#128274;</div>
+      <p style="font-size:0.75rem;color:#555;margin-bottom:12px;line-height:1.6">Bloquea los dias que ya tienen plan. La IA los respetara y no asignara sitios en ellos.</p>
+      <div class="lock-days-row" id="lock-days-row"></div>
+      <div id="locked-editors"></div>
+    </div>
+
     <div class="card">
       <div class="card-title">Configurar itinerario</div>
       <div class="itin-controls">
@@ -388,7 +420,31 @@ var SEED = [
 var places = [];
 var voted = [];
 var filter = 'all';
+var tagFilter = 'all';
 var extracted = [];
+var lockedDays = {}; // { 'YYYY-MM-DD': { title: string } }
+
+// Tags
+var TAGS = ['turismo','shopping','restaurante'];
+var TAG_LABELS = { turismo:'Turismo', shopping:'Shopping', restaurante:'Restaurante' };
+function catToTag(cat) {
+  if (cat === 'restaurante') return 'restaurante';
+  if (cat === 'compras') return 'shopping';
+  return 'turismo';
+}
+
+// Trip dates: March 28 - April 4, 2026
+var TRIP_DAYS = (function() {
+  var days = []; var d = new Date('2026-03-28');
+  var labels = ['Vi','Sa','Do','Lu','Ma','Mi','Ju'];
+  for (var i = 0; i < 8; i++) {
+    var key = d.toISOString().slice(0,10);
+    var label = labels[d.getDay()];
+    days.push({ key: key, label: label, date: d.getDate(), month: d.getMonth()+1 });
+    d = new Date(d.getTime() + 86400000);
+  }
+  return days;
+})();
 
 var NYC_DB = {
   'central park': {addr:'Central Park, New York, NY',lat:40.7829,lng:-73.9654,cat:'parque',zone:'manhattan',desc:'El parque mas famoso de NYC, bici, paseo, zoo',tags:'parque jardin naturaleza ninos paseo bici zoo infantil'},
@@ -566,6 +622,7 @@ function enrichPlace(p) {
     if (!p.lat) p.lat = info.lat;
     if (!p.lng) p.lng = info.lng;
   }
+  if (!p.tag) p.tag = catToTag(p.cat);
   return p;
 }
 
@@ -599,8 +656,19 @@ function load() {
   if (!places.length) { places = SEED.slice(); }
   places.forEach(function(p){ enrichPlace(p); });
 
+  try { lockedDays = JSON.parse(localStorage.getItem('nyc_locked_v1')) || {}; } catch(e) { lockedDays = {}; }
+
   // Then subscribe to Firebase for real-time sync
   if (fbReady) {
+    fbDb.ref('lockedDays').on('value', function(snapshot) {
+      if (Date.now() - fbSaving < 2000) return;
+      var data = snapshot.val();
+      if (data && typeof data === 'object') {
+        lockedDays = data;
+        try { localStorage.setItem('nyc_locked_v1', JSON.stringify(lockedDays)); } catch(e) {}
+        renderLockDays();
+      }
+    });
     fbDb.ref('places').on('value', function(snapshot) {
       // Skip if we just saved (within 2 seconds)
       if (Date.now() - fbSaving < 2000) return;
@@ -638,10 +706,12 @@ function save() {
     localStorage.setItem(SK, JSON.stringify(places));
     localStorage.setItem(VK, JSON.stringify(voted));
   } catch(e) {}
+  try { localStorage.setItem('nyc_locked_v1', JSON.stringify(lockedDays)); } catch(e) {}
   if (fbReady) {
     fbSaving = Date.now();
     fbDb.ref('places').set(places);
     fbDb.ref('voted').set(voted);
+    fbDb.ref('lockedDays').set(lockedDays);
   }
 }
 
@@ -664,16 +734,19 @@ function sc(n, l) {
 
 function renderPlaces() {
   var list = filter === 'all' ? places.slice() : places.filter(function(p){return p.zone===filter;});
+  if (tagFilter !== 'all') list = list.filter(function(p){ return p.tag === tagFilter; });
   list.sort(function(a,b){return b.votes-a.votes;});
   var g = document.getElementById('places-grid');
-  if (!list.length) { g.innerHTML = '<div class="empty">No hay sitios en esta zona.</div>'; return; }
+  if (!list.length) { g.innerHTML = '<div class="empty">No hay sitios con estos filtros.</div>'; return; }
   g.innerHTML = list.map(function(p) {
     var v = voted.indexOf(p.id) > -1;
     var mu = mapsUrl(p.name, p.addr, p.lat, p.lng);
+    var tag = p.tag || catToTag(p.cat);
     return '<div class="place-card">'+
       '<button class="del-btn" onclick="del('+p.id+')">&#x2715;</button>'+
       '<span class="zone-badge z-'+p.zone+'">'+ZL[p.zone]+'</span>'+
       '<span class="cat-badge">'+p.cat+'</span>'+
+      '<span class="tag-badge tag-'+tag+'" onclick="cycleTag('+p.id+')" title="Cambiar tipo">'+TAG_LABELS[tag]+'</span>'+
       '<div class="place-name">'+esc(p.name)+'</div>'+
       (p.addr?'<div class="place-addr">'+esc(p.addr)+'</div>':'')+
       (p.notes?'<div class="place-notes">'+esc(p.notes)+'</div>':'')+
@@ -940,10 +1013,65 @@ function vote(id) {
   save(); renderPlaces(); renderStats();
 }
 
+function cycleTag(id) {
+  var p = places.find(function(x){return x.id===id;});
+  if (!p) return;
+  var idx = TAGS.indexOf(p.tag || 'turismo');
+  p.tag = TAGS[(idx+1) % TAGS.length];
+  save(); renderPlaces();
+  toast('"'+p.name+'" \u2192 '+TAG_LABELS[p.tag]);
+}
+
 function setFilter(z, btn) {
   filter = z;
-  document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});
+  document.querySelectorAll('#zone-filters .filter-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active'); renderPlaces();
+}
+
+function setTagFilter(t, btn) {
+  tagFilter = t;
+  document.querySelectorAll('#tag-filters .filter-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active'); renderPlaces();
+}
+
+function toggleLockDay(key) {
+  if (lockedDays[key]) {
+    delete lockedDays[key];
+  } else {
+    lockedDays[key] = { title: '' };
+  }
+  save(); renderLockDays();
+}
+
+function updateLockTitle(key, val) {
+  if (lockedDays[key]) lockedDays[key].title = val;
+  save();
+}
+
+function renderLockDays() {
+  var row = document.getElementById('lock-days-row');
+  var editors = document.getElementById('locked-editors');
+  if (!row || !editors) return;
+  var dayNames = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
+  row.innerHTML = TRIP_DAYS.map(function(d) {
+    var locked = !!lockedDays[d.key];
+    return '<button class="lock-pill'+(locked?' locked':'')+'" onclick="toggleLockDay(\''+d.key+'\')">'+
+      '<span class="pill-day">'+d.label+' '+d.date+'/'+d.month+'</span>'+
+      (locked?'&#128274;':'&#128275;')+
+    '</button>';
+  }).join('');
+  var lockedList = TRIP_DAYS.filter(function(d){ return !!lockedDays[d.key]; });
+  if (!lockedList.length) { editors.innerHTML = ''; return; }
+  editors.innerHTML = '<div style="margin-top:4px">' +
+    lockedList.map(function(d) {
+      var val = lockedDays[d.key].title || '';
+      return '<div class="locked-editor">'+
+        '<div class="locked-editor-title">&#128274; '+d.label+' '+d.date+'/'+d.month+' &mdash; Plan bloqueado</div>'+
+        '<input type="text" placeholder="Describe el plan (ej: Estatua de la Libertad + ferry)" value="'+esc(val)+'" '+
+          'oninput="updateLockTitle(\''+d.key+'\', this.value)" style="width:100%" />'+
+      '</div>';
+    }).join('') +
+  '</div>';
 }
 
 function switchTab(tab, btn) {
@@ -1176,6 +1304,13 @@ function clearImport() {
 function buildLocalItinerary(days, pace, prio, dateVal) {
   var maxPerDay = pace === 'relajado' ? 3 : pace === 'normal' ? 5 : 7;
   var sorted = places.slice();
+  // Identify locked day indices (0-based)
+  var lockedIndices = {};
+  if (dateVal) {
+    TRIP_DAYS.forEach(function(d, i) {
+      if (i < days && lockedDays[d.key]) lockedIndices[i] = lockedDays[d.key].title || 'Plan privado';
+    });
+  }
 
   if (prio === 'votos') {
     sorted.sort(function(a,b){ return b.votes - a.votes; });
@@ -1194,22 +1329,39 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
     sorted.forEach(function(p){ if(zoneGroups[p.zone]) zoneGroups[p.zone].push(p); });
     var dayPlan = [];
     var dayNum = 0;
-    VZ.forEach(function(z) {
-      var items = zoneGroups[z];
-      if (!items.length) return;
-      items.sort(function(a,b){ return b.votes - a.votes; });
-      for (var i = 0; i < items.length; i += maxPerDay) {
-        if (dayNum >= days) break;
-        dayPlan.push({ zone: z, items: items.slice(i, i + maxPerDay) });
-        dayNum++;
+    var zIdx = 0; var zKeys = VZ.slice(); var zItemIdx = 0;
+    for (var di = 0; di < days; di++) {
+      if (lockedIndices[di] !== undefined) {
+        dayPlan.push({ locked: true, lockedTitle: lockedIndices[di], items: [] });
+        dayNum++; continue;
       }
-    });
-    return dayPlan.slice(0, days);
+      // find next non-empty zone batch
+      var placed = false;
+      while (zIdx < zKeys.length && !placed) {
+        var z = zKeys[zIdx];
+        var items = zoneGroups[z];
+        items.sort(function(a,b){ return b.votes - a.votes; });
+        var batch = items.slice(zItemIdx, zItemIdx + maxPerDay);
+        if (batch.length) {
+          dayPlan.push({ zone: z, items: batch });
+          zItemIdx += maxPerDay;
+          if (zItemIdx >= items.length) { zIdx++; zItemIdx = 0; }
+          placed = true;
+        } else { zIdx++; zItemIdx = 0; }
+      }
+      if (!placed) break;
+      dayNum++;
+    }
+    return dayPlan;
   }
 
   var dayPlan = [];
   var used = 0;
   for (var d = 0; d < days; d++) {
+    if (lockedIndices[d] !== undefined) {
+      dayPlan.push({ locked: true, lockedTitle: lockedIndices[d], items: [] });
+      continue;
+    }
     var batch = sorted.slice(used, used + maxPerDay);
     if (!batch.length) break;
     var zoneCounts = {};
@@ -1234,6 +1386,16 @@ function renderLocalItin(dayPlan, dateVal, pace) {
       var d = new Date(startDate.getTime() + i * 86400000);
       title += ' - ' + dayNames[d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth()+1);
     }
+
+    // Locked day
+    if (day.locked) {
+      title += ' \uD83D\uDD12 BLOQUEADO';
+      html += '<div class="day-block is-locked"><h3>'+esc(title)+'</h3>'+
+        '<ul><li style="color:#ccc;font-size:0.9rem">'+esc(day.lockedTitle || 'Plan privado')+'</li>'+
+        '<li style="color:#555;font-style:italic;border:none">Este dia tiene un plan fijo.</li></ul></div>';
+      return;
+    }
+
     title += ' -- Zona: ' + ZL[day.zone];
 
     var items = day.items;
@@ -1285,10 +1447,27 @@ function generateItinerary() {
   var pt = places.slice().sort(function(a,b){return b.votes-a.votes;})
     .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.cat+', '+p.votes+' votos'+(p.notes?', '+p.notes:'')+')';}).join('\n');
   var pr = prio==='votos'?'priorizar los mas votados':prio==='ninos'?'priorizar aptos para ninos':'agrupar por zona geografica';
+
+  // Build locked days context
+  var lockedInfo = '';
+  if (dateVal) {
+    var lockedLines = [];
+    TRIP_DAYS.forEach(function(d, i) {
+      if (lockedDays[d.key]) {
+        var title = lockedDays[d.key].title || 'plan privado';
+        lockedLines.push('- '+d.label+' '+d.date+'/'+d.month+' (dia '+(i+1)+'): BLOQUEADO — '+title);
+      }
+    });
+    if (lockedLines.length) {
+      lockedInfo = '\nDias ya planificados (NO asignes sitios de la lista en estos dias, incluyelos en el itinerario con su plan):\n'+lockedLines.join('\n')+'\n';
+    }
+  }
+
   var prompt = 'Eres experto en viajes familiares a Nueva York. Grupo: 8 adultos y 8 ninos de 5 a 15 anos.\n'+
-    'Viaje: '+days+' dias, ritmo '+pace+', prioridad: '+pr+'.\n\n'+
+    'Viaje: '+days+' dias, ritmo '+pace+', prioridad: '+pr+'.\n'+
+    lockedInfo+'\n'+
     'Sitios propuestos:\n'+pt+'\n\n'+
-    'Genera itinerario dia a dia'+(dateVal?' desde el '+dateVal:'')+'. Cada dia: zona principal, sitios en orden logico manana-tarde-noche, 1-2 consejos para grupo con ninos. Encabezados DIA 1, DIA 2, etc. En espanol, conciso.';
+    'Genera itinerario dia a dia'+(dateVal?' desde el '+dateVal:'')+'. Para dias bloqueados muestra el plan fijo. Para el resto: zona principal, sitios en orden logico manana-tarde-noche, 1-2 consejos para grupo con ninos. Encabezados DIA 1, DIA 2, etc. En espanol, conciso.';
 
   fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
@@ -1337,7 +1516,8 @@ function toast(msg) {
 }
 
 load(); render();
-try{document.getElementById('cfg-date').valueAsDate=new Date();}catch(e){}
+try{document.getElementById('cfg-date').value='2026-03-29';}catch(e){}
+renderLockDays();
 
 // Show sync status
 var syncEl = document.getElementById('sync-status');
