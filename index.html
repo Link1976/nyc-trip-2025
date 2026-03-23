@@ -276,6 +276,7 @@
   <button class="tab-btn" onclick="switchTab('import',this)">Importar</button>
   <button class="tab-btn" onclick="switchTab('itinerary',this)">Itinerario IA</button>
   <button class="tab-btn" onclick="switchTab('zones',this)">Zonas</button>
+  <button class="tab-btn" onclick="switchTab('hotel',this)">Hotel</button>
 </div>
 
 <div class="main">
@@ -399,6 +400,72 @@
   <!-- ZONES -->
   <div id="tab-zones" class="tab-panel">
     <div id="zones-view"></div>
+  </div>
+
+  <!-- HOTEL -->
+  <div id="tab-hotel" class="tab-panel">
+    <div class="card" style="border-left:4px solid var(--yellow);border-radius:0 10px 10px 0;padding:20px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+        <span style="font-size:2rem">&#127970;</span>
+        <div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:2px;color:var(--yellow);line-height:1">INNSiDE by Meliá</div>
+          <div style="font-size:0.95rem;font-weight:600;color:var(--white)">New York NoMad</div>
+        </div>
+      </div>
+
+      <div style="display:grid;gap:14px">
+
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:1.2rem;margin-top:2px">&#128205;</span>
+          <div>
+            <div style="font-size:0.7rem;text-transform:uppercase;color:#555;letter-spacing:1px;margin-bottom:2px">Dirección</div>
+            <div style="font-size:0.95rem;color:var(--white)">132 West 27th Street</div>
+            <div style="font-size:0.88rem;color:#888">New York, NY 10001 · NoMad</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:1.2rem;margin-top:2px">&#128222;</span>
+          <div>
+            <div style="font-size:0.7rem;text-transform:uppercase;color:#555;letter-spacing:1px;margin-bottom:2px">Teléfono</div>
+            <a href="tel:+12129511000" style="font-size:0.95rem;color:var(--yellow);text-decoration:none;font-weight:600">+1 212 951 1000</a>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:1.2rem;margin-top:2px">&#128336;</span>
+          <div>
+            <div style="font-size:0.7rem;text-transform:uppercase;color:#555;letter-spacing:1px;margin-bottom:2px">Check-in / Check-out</div>
+            <div style="font-size:0.95rem;color:var(--white)">Entrada: <strong>15:00</strong> &nbsp;·&nbsp; Salida: <strong>12:00</strong></div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:1.2rem;margin-top:2px">&#128197;</span>
+          <div>
+            <div style="font-size:0.7rem;text-transform:uppercase;color:#555;letter-spacing:1px;margin-bottom:2px">Fechas</div>
+            <div style="font-size:0.95rem;color:var(--white)">28 marzo → 4 abril 2026</div>
+            <div style="font-size:0.82rem;color:#888">Llegada noche del 28 · Salida antes de las 12:00 del 4</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="margin-top:22px;display:grid;gap:10px">
+        <a href="https://www.google.com/maps/search/?api=1&query=40.7476,-73.9961" target="_blank" rel="noopener"
+           style="display:flex;align-items:center;justify-content:center;gap:8px;background:#1A73E8;color:white;font-weight:700;font-size:0.9rem;padding:13px 20px;border-radius:8px;text-decoration:none">
+          &#128205; Abrir en Google Maps
+        </a>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=40.7476,-73.9961&travelmode=walking" target="_blank" rel="noopener"
+           style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mid);border:1px solid #3a3a3a;color:var(--white);font-weight:600;font-size:0.88rem;padding:12px 20px;border-radius:8px;text-decoration:none">
+          &#128663; Cómo llegar
+        </a>
+        <a href="https://www.melia.com/en/hotels/united-states/new-york/innside-new-york-nomad" target="_blank" rel="noopener"
+           style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mid);border:1px solid #3a3a3a;color:#888;font-size:0.85rem;padding:11px 20px;border-radius:8px;text-decoration:none">
+          &#127758; Web oficial Meliá
+        </a>
+      </div>
+    </div>
   </div>
 
 </div>
