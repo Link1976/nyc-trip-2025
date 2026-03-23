@@ -436,7 +436,7 @@ function catToTag(cat) {
 // Trip dates: March 28 - April 4, 2026
 var TRIP_DAYS = (function() {
   var days = []; var d = new Date('2026-03-28T12:00:00');
-  var labels = ['Vi','Sa','Do','Lu','Ma','Mi','Ju'];
+  var labels = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
   for (var i = 0; i < 8; i++) {
     var key = d.toISOString().slice(0,10);
     var label = labels[d.getDay()];
