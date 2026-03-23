@@ -166,6 +166,11 @@
 
   .import-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
   textarea.import-area { min-height: 160px; resize: vertical; }
+  .file-drop { border:2px dashed #3a3a3a; border-radius:8px; padding:28px 16px; text-align:center; cursor:pointer; color:#555; font-size:0.85rem; transition:border-color 0.2s,color 0.2s; }
+  .file-drop:hover, .file-drop.drag-over { border-color:var(--yellow); color:var(--yellow); }
+  .img-preview-wrap { position:relative; margin-top:10px; }
+  .img-thumb { width:100%; max-height:160px; object-fit:cover; border-radius:8px; display:block; }
+  .img-clear { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6); border:none; color:white; border-radius:50%; width:26px; height:26px; cursor:pointer; font-size:0.9rem; }
   .progress-bar { height: 3px; background: var(--mid); border-radius: 2px; margin: 10px 0; overflow: hidden; display: none; }
   .progress-fill { height: 100%; background: var(--yellow); border-radius: 2px; width: 0; transition: width 0.4s; }
 
@@ -329,9 +334,12 @@
 
   <!-- IMPORT -->
   <div id="tab-import" class="tab-panel">
-    <div class="import-grid">
+
+    <div class="import-grid" style="margin-bottom:14px">
+
+      <!-- Texto -->
       <div class="card">
-        <div class="card-title">Pega texto del grupo</div>
+        <div class="card-title">&#128172; Pega texto del grupo</div>
         <textarea class="import-area" id="import-text" placeholder="Pega mensajes de WhatsApp, emails, notas..."></textarea>
         <p style="font-size:0.75rem;color:#555;margin-top:8px;line-height:1.6">La IA extrae los sitios, infiere zona y categoria, y detecta duplicados automaticamente.</p>
         <div class="progress-bar" id="extract-progress"><div class="progress-fill" id="extract-fill"></div></div>
@@ -341,18 +349,51 @@
         </div>
       </div>
 
+      <!-- Captura de pantalla -->
       <div class="card">
-        <div class="card-title">Sitios detectados</div>
-        <div id="extracted-results">
-          <div class="empty">Los sitios detectados apareceran aqui.<br><br><span style="color:var(--green)">Verde = nuevo</span><br><span style="color:#E67E22">Naranja = ya existe</span></div>
+        <div class="card-title">&#128247; Captura de pantalla</div>
+        <p style="font-size:0.75rem;color:#555;margin-bottom:10px;line-height:1.6">Sube una foto de una lista, pantallazo de WhatsApp o cualquier imagen con sitios.</p>
+        <div class="file-drop" id="file-drop" onclick="document.getElementById('img-input').click()"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="event.preventDefault();this.classList.remove('drag-over');handleImageFile(event.dataTransfer.files[0])">
+          <input type="file" id="img-input" accept="image/*" style="display:none" onchange="handleImageFile(this.files[0])">
+          &#128247; Toca para seleccionar imagen<br><span style="font-size:0.72rem;color:#444">o arrastra aqui</span>
         </div>
-        <div id="import-summary" class="import-summary" style="display:none"></div>
-        <div id="import-actions" style="display:none" class="btn-row">
-          <button class="btn" id="confirm-btn" onclick="confirmImport()">Confirmar</button>
-          <button class="btn btn-outline btn-inline" onclick="clearExtracted()">Descartar</button>
+        <div class="img-preview-wrap" id="img-preview" style="display:none">
+          <img class="img-thumb" id="img-thumb" src="" alt="">
+          <button class="img-clear" onclick="clearImage()">&#x2715;</button>
         </div>
+        <div class="progress-bar" id="img-progress" style="margin-top:10px"><div class="progress-fill" id="img-fill"></div></div>
+        <button class="btn btn-red" id="analyze-btn" onclick="analyzeImage()" style="display:none;margin-top:10px">Analizar con IA</button>
+      </div>
+
+    </div>
+
+    <!-- Google Maps URL (ancho completo) -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">&#128205; Itinerario de Google Maps</div>
+      <p style="font-size:0.75rem;color:#555;margin-bottom:10px;line-height:1.6">Pega el enlace de una ruta o itinerario de Google Maps y extraeremos los sitios automaticamente.</p>
+      <div class="search-box">
+        <input type="url" id="gmaps-url" placeholder="https://www.google.com/maps/dir/Times+Square/Central+Park/..." />
+        <button class="btn btn-red btn-inline" id="gmaps-btn" onclick="importFromMaps()">Importar</button>
+      </div>
+      <p style="font-size:0.72rem;color:#444;margin-top:6px;line-height:1.5">Funciona con rutas (maps/dir/...) y tambien con listas compartidas. En Google Maps: menu &#8250; Compartir &#8250; Copiar enlace.</p>
+    </div>
+
+    <!-- Resultados detectados (ancho completo) -->
+    <div class="card">
+      <div class="card-title">Sitios detectados</div>
+      <div id="extracted-results">
+        <div class="empty">Los sitios detectados apareceran aqui.<br><br><span style="color:var(--green)">Verde = nuevo</span> &nbsp; <span style="color:#E67E22">Naranja = ya existe</span></div>
+      </div>
+      <div id="import-summary" class="import-summary" style="display:none"></div>
+      <div id="import-actions" style="display:none" class="btn-row">
+        <button class="btn" id="confirm-btn" onclick="confirmImport()">Confirmar</button>
+        <button class="btn btn-outline btn-inline" onclick="clearExtracted()">Descartar</button>
       </div>
     </div>
+
   </div>
 
   <!-- ITINERARY -->
@@ -1404,6 +1445,150 @@ function clearExtracted() {
 function clearImport() {
   document.getElementById('import-text').value='';
   clearExtracted();
+}
+
+// ── Screenshot import ──────────────────────────────────────────────────────────
+var pendingImgBase64 = null;
+var pendingImgType = 'image/jpeg';
+
+function handleImageFile(file) {
+  if (!file || !file.type.match(/^image\//)) { toast('Selecciona una imagen'); return; }
+  pendingImgType = file.type;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    pendingImgBase64 = e.target.result.split(',')[1];
+    document.getElementById('img-thumb').src = e.target.result;
+    document.getElementById('img-preview').style.display = 'block';
+    document.getElementById('file-drop').style.display = 'none';
+    document.getElementById('analyze-btn').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImage() {
+  pendingImgBase64 = null;
+  document.getElementById('img-preview').style.display = 'none';
+  document.getElementById('file-drop').style.display = 'block';
+  document.getElementById('analyze-btn').style.display = 'none';
+  document.getElementById('img-input').value = '';
+}
+
+function analyzeImage() {
+  if (!pendingImgBase64) { toast('Selecciona una imagen primero'); return; }
+  var btn = document.getElementById('analyze-btn');
+  btn.disabled = true; btn.textContent = 'Analizando...';
+  var prog = document.getElementById('img-progress');
+  var fill = document.getElementById('img-fill');
+  prog.style.display = 'block'; fill.style.width = '40%';
+  var existing = places.map(function(p) { return p.name.toLowerCase(); });
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: pendingImgType, data: pendingImgBase64 } },
+          { type: 'text', text: 'Extrae todos los nombres de lugares, restaurantes, tiendas y sitios turisticos de Nueva York que aparezcan en esta imagen. Devuelve UNA linea por sitio:\nNOMBRE|ZONA|CATEGORIA|NOTA\nZONA: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos, sin explicaciones ni numeracion.' }
+        ]
+      }]
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    fill.style.width = '90%';
+    if (data.error) throw new Error(data.error.message);
+    var raw = (data.content||[]).map(function(b){return b.text||'';}).join('');
+    var parsed = raw.split('\n').map(function(l){return l.trim();})
+      .filter(function(l){return l.indexOf('|')>-1;})
+      .map(function(l){
+        var parts = l.split('|').map(function(p){return p.replace(/^\d+[\.\)]\s*/,'').trim();});
+        var name = parts[0]; if(!name||name.length<2) return null;
+        var zone = VZ.filter(function(z){return (parts[1]||'').toLowerCase().indexOf(z)>-1;})[0]||guessZone(name);
+        var cat  = VC.filter(function(c){return (parts[2]||'').toLowerCase().indexOf(c)>-1;})[0]||guessCat(name,name);
+        var notes = parts[3]||'';
+        var isDup = existing.some(function(n){return sim(n,name)>0.75;});
+        return {id:Date.now()+Math.random(),name:name,zone:zone,cat:cat,notes:notes,isDup:isDup};
+      }).filter(function(x){return x!==null;});
+    extracted = parsed;
+    renderExtracted();
+    toast(parsed.length+' sitios detectados en la imagen');
+  })
+  .catch(function(err) {
+    toast('Error al analizar imagen: '+err.message);
+  })
+  .finally(function() {
+    btn.disabled=false; btn.textContent='Analizar con IA';
+    setTimeout(function(){prog.style.display='none';fill.style.width='0';},500);
+  });
+}
+
+// ── Google Maps URL import ─────────────────────────────────────────────────────
+function importFromMaps() {
+  var url = document.getElementById('gmaps-url').value.trim();
+  if (!url) { toast('Pega una URL de Google Maps'); return; }
+  var btn = document.getElementById('gmaps-btn');
+  var existing = places.map(function(p){ return p.name.toLowerCase(); });
+
+  // Parse maps/dir/ URL directly — no API needed
+  var dirMatch = url.match(/maps\/dir\/([^@?#]+)/);
+  if (dirMatch) {
+    var segments = dirMatch[1].split('/')
+      .map(function(s){ return decodeURIComponent(s.replace(/\+/g,' ')).trim(); })
+      .filter(function(s){
+        return s && s.length > 2 &&
+          !/^\d+\.\d+,?\d*$/.test(s) &&   // skip coords
+          !/^data=/.test(s);               // skip data params
+      });
+    if (segments.length > 0) {
+      extracted = segments.map(function(name){
+        var isDup = existing.some(function(n){return sim(n,name)>0.75;});
+        return {id:Date.now()+Math.random(),name:name,zone:guessZone(name),cat:guessCat(name,name),notes:'',isDup:isDup};
+      });
+      renderExtracted();
+      toast(extracted.length+' sitios extraidos de la ruta');
+      document.getElementById('gmaps-url').value='';
+      return;
+    }
+  }
+
+  // Fallback: send URL to Claude to extract place names
+  btn.disabled=true; btn.textContent='Analizando...';
+  fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514', max_tokens:800,
+      messages:[{role:'user',content:'Esta es una URL de Google Maps compartida:\n'+url+'\n\nExtrae todos los nombres de lugares de Nueva York que puedas identificar. Devuelve UNA linea por sitio:\nNOMBRE|ZONA|CATEGORIA\nZONA: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos.'}]
+    })
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if(data.error) throw new Error(data.error.message);
+    var raw=(data.content||[]).map(function(b){return b.text||'';}).join('');
+    var parsed=raw.split('\n').map(function(l){return l.trim();})
+      .filter(function(l){return l.indexOf('|')>-1;})
+      .map(function(l){
+        var parts=l.split('|').map(function(p){return p.trim();});
+        var name=parts[0]; if(!name||name.length<2) return null;
+        var zone=VZ.filter(function(z){return (parts[1]||'').toLowerCase().indexOf(z)>-1;})[0]||'manhattan';
+        var cat=VC.filter(function(c){return (parts[2]||'').toLowerCase().indexOf(c)>-1;})[0]||'otro';
+        var isDup=existing.some(function(n){return sim(n,name)>0.75;});
+        return {id:Date.now()+Math.random(),name:name,zone:zone,cat:cat,notes:'',isDup:isDup};
+      }).filter(function(x){return x!==null;});
+    extracted=parsed;
+    renderExtracted();
+    toast(parsed.length>0?parsed.length+' sitios extraidos':'No se detectaron sitios en la URL');
+    document.getElementById('gmaps-url').value='';
+  })
+  .catch(function(err){toast('Error: '+err.message);})
+  .finally(function(){btn.disabled=false;btn.textContent='Importar';});
 }
 
 function buildLocalItinerary(days, pace, prio, dateVal) {
