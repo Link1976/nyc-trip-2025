@@ -159,6 +159,10 @@
   .del-btn { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #333; cursor: pointer; font-size: 1rem; padding: 4px; }
   .vote-btn { background: none; border: 1px solid #3a3a3a; border-radius: 6px; color: #555; cursor: pointer; font-size: 0.78rem; padding: 5px 10px; margin-top: 10px; font-family: 'DM Sans', sans-serif; }
   .vote-btn.voted { border-color: var(--green); color: var(--green); }
+  .visit-btn { background: none; border: 1px solid #3a3a3a; border-radius: 6px; color: #555; cursor: pointer; font-size: 0.78rem; padding: 5px 10px; margin-top: 10px; margin-left: 6px; font-family: 'DM Sans', sans-serif; transition: all 0.2s; }
+  .visit-btn.done { border-color: var(--green); color: var(--green); background: rgba(61,220,132,0.08); font-weight: 700; }
+  .place-card.visited-card { opacity: 0.6; }
+  .place-card.visited-card .place-name { text-decoration: line-through; color: #555; }
 
   .import-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
   textarea.import-area { min-height: 160px; resize: vertical; }
@@ -309,6 +313,8 @@
       <button class="filter-btn" onclick="setFilter('queens',this)">Queens</button>
       <button class="filter-btn" onclick="setFilter('bronx',this)">Bronx</button>
       <button class="filter-btn" onclick="setFilter('staten',this)">Staten I.</button>
+      <button class="filter-btn" onclick="setFilter('visited',this)" style="color:#3DDC84;border-color:#3DDC8444">&#10003; Vistos</button>
+      <button class="filter-btn" onclick="setFilter('pending',this)">Pendientes</button>
     </div>
     <div class="filters" id="tag-filters" style="margin-top:-6px">
       <button class="filter-btn active" onclick="setTagFilter('all',this)">&#9632; Todos</button>
@@ -419,6 +425,7 @@ var SEED = [
 
 var places = [];
 var voted = [];
+var visited = [];
 var filter = 'all';
 var tagFilter = 'all';
 var extracted = [];
@@ -653,6 +660,7 @@ function load() {
   // Load from localStorage first (fast, offline-capable)
   try { places = JSON.parse(localStorage.getItem(SK)) || []; } catch(e) { places = []; }
   try { voted = JSON.parse(localStorage.getItem(VK)) || []; } catch(e) { voted = []; }
+  try { visited = JSON.parse(localStorage.getItem('nyc_visited_v1')) || []; } catch(e) { visited = []; }
   if (!places.length) { places = SEED.slice(); }
   places.forEach(function(p){ enrichPlace(p); });
 
@@ -688,6 +696,15 @@ function load() {
         try { localStorage.setItem(VK, JSON.stringify(voted)); } catch(e) {}
       }
     });
+    fbDb.ref('visited').on('value', function(snapshot) {
+      if (Date.now() - fbSaving < 2000) return;
+      var data = snapshot.val();
+      if (data) {
+        visited = data;
+        try { localStorage.setItem('nyc_visited_v1', JSON.stringify(visited)); } catch(e) {}
+        renderPlaces(); renderStats();
+      }
+    });
     // Push initial data if Firebase is empty
     fbDb.ref('places').once('value', function(snapshot) {
       var data = snapshot.val();
@@ -707,10 +724,12 @@ function save() {
     localStorage.setItem(VK, JSON.stringify(voted));
   } catch(e) {}
   try { localStorage.setItem('nyc_locked_v1', JSON.stringify(lockedDays)); } catch(e) {}
+  try { localStorage.setItem('nyc_visited_v1', JSON.stringify(visited)); } catch(e) {}
   if (fbReady) {
     fbSaving = Date.now();
     fbDb.ref('places').set(places);
     fbDb.ref('voted').set(voted);
+    fbDb.ref('visited').set(visited);
     fbDb.ref('lockedDays').set(lockedDays);
   }
 }
@@ -725,7 +744,7 @@ function renderStats() {
   });
   document.getElementById('stats-row').innerHTML =
     sc(places.length, 'Sitios') + sc(Object.keys(zones).length, 'Zonas') +
-    sc(Object.keys(cats).length, 'Categorias') + sc(top, topN || 'Max votos');
+    sc(visited.length, 'Vistos') + sc(top, topN || 'Max votos');
 }
 
 function sc(n, l) {
@@ -733,16 +752,24 @@ function sc(n, l) {
 }
 
 function renderPlaces() {
-  var list = filter === 'all' ? places.slice() : places.filter(function(p){return p.zone===filter;});
+  var list = filter === 'all' ? places.slice() :
+             filter === 'visited' ? places.filter(function(p){ return visited.indexOf(p.id) > -1; }) :
+             filter === 'pending' ? places.filter(function(p){ return visited.indexOf(p.id) === -1; }) :
+             places.filter(function(p){ return p.zone === filter; });
   if (tagFilter !== 'all') list = list.filter(function(p){ return p.tag === tagFilter; });
-  list.sort(function(a,b){return b.votes-a.votes;});
+  list.sort(function(a,b){
+    var av = visited.indexOf(a.id) > -1, bv = visited.indexOf(b.id) > -1;
+    if (av !== bv) return av ? 1 : -1; // visited al final
+    return b.votes - a.votes;
+  });
   var g = document.getElementById('places-grid');
   if (!list.length) { g.innerHTML = '<div class="empty">No hay sitios con estos filtros.</div>'; return; }
   g.innerHTML = list.map(function(p) {
     var v = voted.indexOf(p.id) > -1;
+    var vis = visited.indexOf(p.id) > -1;
     var mu = mapsUrl(p.name, p.addr, p.lat, p.lng);
     var tag = p.tag || catToTag(p.cat);
-    return '<div class="place-card">'+
+    return '<div class="place-card'+(vis?' visited-card':'')+'">'+
       '<button class="del-btn" onclick="del('+p.id+')">&#x2715;</button>'+
       '<span class="zone-badge z-'+p.zone+'">'+ZL[p.zone]+'</span>'+
       '<span class="cat-badge">'+p.cat+'</span>'+
@@ -751,9 +778,13 @@ function renderPlaces() {
       (p.addr?'<div class="place-addr">'+esc(p.addr)+'</div>':'')+
       (p.notes?'<div class="place-notes">'+esc(p.notes)+'</div>':'')+
       '<div class="place-who">Por: '+(p.who?esc(p.who):'Anonimo')+'</div>'+
-      '<button class="vote-btn'+(v?' voted':'')+ '" onclick="vote('+p.id+')">'+
-        (v?'&#10003;':'+')+'&nbsp;<strong>'+p.votes+'</strong> votos</button>'+
-      '<a class="maps-link" href="'+mu+'" target="_blank" rel="noopener">Maps</a>'+
+      '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:8px">'+
+        '<button class="vote-btn'+(v?' voted':'')+ '" onclick="vote('+p.id+')">'+
+          (v?'&#10003;':'+')+'&nbsp;<strong>'+p.votes+'</strong> votos</button>'+
+        '<button class="visit-btn'+(vis?' done':'')+ '" onclick="toggleVisit('+p.id+')">'+
+          (vis?'&#10003; Visto':'&#9675; Marcar visto')+'</button>'+
+        '<a class="maps-link" href="'+mu+'" target="_blank" rel="noopener">Maps</a>'+
+      '</div>'+
     '</div>';
   }).join('');
 }
@@ -1010,6 +1041,13 @@ function vote(id) {
   if (!p) return;
   if (i>-1) { voted.splice(i,1); p.votes=Math.max(0,p.votes-1); }
   else { voted.push(id); p.votes++; }
+  save(); renderPlaces(); renderStats();
+}
+
+function toggleVisit(id) {
+  var i = visited.indexOf(id);
+  if (i > -1) { visited.splice(i, 1); }
+  else { visited.push(id); }
   save(); renderPlaces(); renderStats();
 }
 
