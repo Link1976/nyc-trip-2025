@@ -268,36 +268,6 @@
     .cols3, .cols2 { grid-template-columns: 1fr; }
   }
 
-  /* API Key Panel */
-  #api-panel {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.7);
-    z-index: 200;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 80px;
-  }
-  #api-panel.open { display: flex; }
-  .api-panel-box {
-    background: var(--gray);
-    border: 1px solid #333;
-    border-radius: 12px;
-    padding: 24px;
-    width: 90%;
-    max-width: 420px;
-  }
-  .api-panel-title { font-weight: 700; font-size: 1rem; margin-bottom: 6px; }
-  .api-panel-hint { font-size: 0.78rem; color: #777; margin-bottom: 16px; line-height: 1.5; }
-  .api-panel-input {
-    width: 100%; background: var(--mid); border: 1px solid #444;
-    border-radius: 8px; color: var(--white); font-size: 0.85rem;
-    padding: 10px 12px; font-family: monospace; margin-bottom: 12px;
-  }
-  .api-panel-input:focus { outline: none; border-color: var(--yellow); }
-  .api-panel-btns { display: flex; gap: 8px; justify-content: flex-end; }
-  #api-btn.has-key { color: var(--green); border-color: var(--green); }
 </style>
 </head>
 <body>
@@ -306,27 +276,9 @@
   <div class="logo">NYC<span class="dot">.</span>Trip<span class="sub">2026</span></div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="header-meta"><span id="sync-status"></span>8 adultos &middot; 8 ninos</div>
-    <button onclick="toggleApiPanel()" title="Configurar API Key" style="background:none;border:1px solid #333;border-radius:6px;color:#555;cursor:pointer;padding:4px 8px;font-size:0.85rem" id="api-btn">&#9881;</button>
   </div>
 </header>
 
-<!-- API Key Panel -->
-<div id="api-panel" onclick="if(event.target===this)toggleApiPanel()">
-  <div class="api-panel-box">
-    <div class="api-panel-title">&#9881; Configurar Google Gemini API Key</div>
-    <div class="api-panel-hint">
-      Opcional. Mejora la busqueda de sitios, analiza capturas y genera itinerarios.<br>
-      <strong>Gratis</strong> en el tier gratuito de Google AI Studio (15 llamadas/min, sin tarjeta).<br>
-      Obtenla en <strong>aistudio.google.com</strong> → Get API key.<br>
-      Se guarda solo en este dispositivo.
-    </div>
-    <input type="password" id="api-key-input" class="api-panel-input" placeholder="AIza..." autocomplete="off" />
-    <div class="api-panel-btns">
-      <button class="btn btn-outline btn-inline" onclick="toggleApiPanel()">Cancelar</button>
-      <button class="btn" onclick="saveApiKey()">Guardar</button>
-    </div>
-  </div>
-</div>
 
 <div class="tabs">
   <button class="tab-btn active" onclick="switchTab('places',this)">Sitios</button>
@@ -576,29 +528,7 @@ function getApiKey() {
   return _geminiKeyFromFirebase || localStorage.getItem(API_KEY_SK) || '';
 }
 
-function toggleApiPanel() {
-  var panel = document.getElementById('api-panel');
-  var inp = document.getElementById('api-key-input');
-  if (panel.classList.contains('open')) {
-    panel.classList.remove('open');
-  } else {
-    inp.value = getApiKey();
-    panel.classList.add('open');
-    setTimeout(function() { inp.focus(); }, 100);
-  }
-}
 
-function saveApiKey() {
-  var key = document.getElementById('api-key-input').value.trim();
-  if (key) {
-    localStorage.setItem(API_KEY_SK, key);
-    document.getElementById('api-btn').classList.add('has-key');
-  } else {
-    localStorage.removeItem(API_KEY_SK);
-    document.getElementById('api-btn').classList.remove('has-key');
-  }
-  document.getElementById('api-panel').classList.remove('open');
-}
 
 function _geminiText(data) {
   return ((data.candidates || [])[0] || {content:{parts:[]}}).content.parts
@@ -1037,7 +967,6 @@ try {
     var k = snap.val();
     if (k && typeof k === 'string' && k.length > 10) {
       _geminiKeyFromFirebase = k;
-      document.getElementById('api-btn').classList.add('has-key');
     }
   });
 } catch(e) {
@@ -2077,7 +2006,6 @@ function toast(msg) {
 load(); render();
 try{document.getElementById('cfg-date').value='2026-03-29';}catch(e){}
 renderLockDays();
-if (getApiKey()) { document.getElementById('api-btn').classList.add('has-key'); }
 
 // Show sync status
 var syncEl = document.getElementById('sync-status');
