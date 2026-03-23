@@ -1341,7 +1341,7 @@ function clearImport() {
 
 function buildLocalItinerary(days, pace, prio, dateVal) {
   var maxPerDay = pace === 'relajado' ? 3 : pace === 'normal' ? 5 : 7;
-  var sorted = places.slice();
+  var sorted = places.filter(function(p){ return visited.indexOf(p.id) === -1; });
   // Identify locked day indices (0-based)
   var lockedIndices = {};
   if (dateVal) {
@@ -1482,7 +1482,8 @@ function generateItinerary() {
   btn.disabled=true; btn.textContent='Generando...';
   var out = document.getElementById('itin-output');
   out.innerHTML='<div class="empty">Pensando el itinerario para el grupo...</div>';
-  var pt = places.slice().sort(function(a,b){return b.votes-a.votes;})
+  var pt = places.slice().filter(function(p){ return visited.indexOf(p.id) === -1; })
+    .sort(function(a,b){return b.votes-a.votes;})
     .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.cat+', '+p.votes+' votos'+(p.notes?', '+p.notes:'')+')';}).join('\n');
   var pr = prio==='votos'?'priorizar los mas votados':prio==='ninos'?'priorizar aptos para ninos':'agrupar por zona geografica';
 
