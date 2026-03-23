@@ -569,9 +569,11 @@
 // ── API Key helpers (Google Gemini — tier gratuito) ───────────────────────────
 var API_KEY_SK = 'nyc_gemini_api_key';
 var GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=';
+var _geminiKeyFromFirebase = ''; // loaded at startup from Firebase /config/geminiKey
 
 function getApiKey() {
-  return localStorage.getItem(API_KEY_SK) || '';
+  // Firebase key takes priority (shared for all users), localStorage as fallback
+  return _geminiKeyFromFirebase || localStorage.getItem(API_KEY_SK) || '';
 }
 
 function toggleApiPanel() {
@@ -1030,6 +1032,14 @@ try {
   fbApp = firebase.initializeApp(firebaseConfig);
   fbDb = firebase.database();
   fbReady = true;
+  // Load shared Gemini key from Firebase (set once by admin in Firebase Console)
+  fbDb.ref('config/geminiKey').once('value', function(snap) {
+    var k = snap.val();
+    if (k && typeof k === 'string' && k.length > 10) {
+      _geminiKeyFromFirebase = k;
+      document.getElementById('api-btn').classList.add('has-key');
+    }
+  });
 } catch(e) {
   fbReady = false;
 }
