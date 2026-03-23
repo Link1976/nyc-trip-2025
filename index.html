@@ -894,7 +894,11 @@ var SEARCH_ALIASES = {
   'familiar':'ellen\'s stardust diner serendipity 3 shake shack junior s cheesecake',
   'frances':'balthazar',
   'salmon':'russ and daughters',
-  'deli':'katz delicatessen russ and daughters zabar\'s'
+  'deli':'katz delicatessen russ and daughters zabar\'s',
+  'sushi':'ippudo ny momofuku noodle bar nom wah tea parlor',
+  'japones':'ippudo ny momofuku noodle bar',
+  'coreano':'ippudo ny',
+  'asiatico restaurante':'chinatown nom wah tea parlor xi\'an famous foods ippudo ny momofuku noodle bar'
 };
 
 function findInDB(name) {
@@ -1179,8 +1183,7 @@ function searchPlaces() {
       document.getElementById('search-results').innerHTML =
         '<div style="color:#888;font-size:0.82rem;padding:12px 0;line-height:1.6">' +
         'No se encontraron sitios para "<strong>' + esc(query) + '</strong>".<br>' +
-        'Prueba con: museo, pizza, ramen, parque, ninos, mirador, shopping...<br>' +
-        'O configura Gemini IA (gratis) con el boton &#9881; para busquedas libres.</div>';
+        'Prueba con: museo, pizza, ramen, parque, ninos, mirador, shopping...</div>';
     }
     btn.disabled = false; btn.textContent = 'Buscar';
     setTimeout(function(){ prog.style.display='none'; fill.style.width='0'; }, 400);
@@ -1239,7 +1242,7 @@ function searchPlaces() {
       document.getElementById('search-results').innerHTML =
         '<div style="color:#888;font-size:0.82rem;padding:12px 0;line-height:1.6">' +
         'No se encontraron sitios para "<strong>' + esc(query) + '</strong>".<br>' +
-        'Prueba con otra busqueda.</div>';
+        '<span style="color:#ef4444;font-size:0.75rem">Error IA: ' + esc(err.message) + '</span></div>';
     }
   })
   .finally(function() {
