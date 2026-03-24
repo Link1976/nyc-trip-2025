@@ -363,13 +363,6 @@
       <button class="filter-btn" onclick="setFilter('visited',this)" style="color:#3DDC84;border-color:#3DDC8444">&#10003; Vistos</button>
       <button class="filter-btn" onclick="setFilter('pending',this)">Pendientes</button>
     </div>
-    <div class="filters" id="tag-filters" style="margin-top:-6px">
-      <button class="filter-btn active" onclick="setTagFilter('all',this)">&#9632; Todos</button>
-      <button class="filter-btn" onclick="setTagFilter('turismo',this)" style="color:#6ab0ff;border-color:#1A73E844">Turismo</button>
-      <button class="filter-btn" onclick="setTagFilter('shopping',this)" style="color:#c07aff;border-color:#9B59B644">Shopping</button>
-      <button class="filter-btn" onclick="setTagFilter('museo',this)" style="color:#34d399;border-color:#34d39944">Museo</button>
-      <button class="filter-btn" onclick="setTagFilter('restaurante',this)" style="color:#ff9f4a;border-color:#E67E2244">Restaurante</button>
-    </div>
 
     <div class="places-grid" id="places-grid"></div>
   </div>
@@ -1189,7 +1182,6 @@ function renderPlaces() {
       '<button class="del-btn" onclick="del('+p.id+')">&#x2715;</button>'+
       '<span class="zone-badge z-'+p.zone+'">'+ZL[p.zone]+'</span>'+
       '<span class="cat-badge">'+p.cat+'</span>'+
-      '<span class="tag-badge tag-'+tag+'" onclick="cycleTag('+p.id+')" title="Cambiar tipo">'+TAG_LABELS[tag]+'</span>'+
       '<div class="place-name">'+esc(p.name)+'</div>'+
       (p.addr?'<div class="place-addr">'+esc(p.addr)+'</div>':'')+
       (p.notes?'<div class="place-notes">'+esc(p.notes)+'</div>':'')+
@@ -2308,10 +2300,19 @@ function openMap() {
     if (!p.lat || !p.lng) return;
     var color = CAT_COLOR[p.cat] || '#9ca3af';
     var isVis = visited.indexOf(p.id) > -1;
-    var marker = L.circleMarker([p.lat, p.lng], {
-      radius: 8, fillColor: color, color: '#000000',
-      weight: 2, opacity: 1, fillOpacity: isVis ? 0.35 : 0.9
-    }).addTo(_map);
+    var marker;
+    if (isVis) {
+      var visIcon = L.divIcon({
+        html: '<div style="width:18px;height:18px;border-radius:50%;background:'+color+';border:2px solid #000;opacity:0.5;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#000;line-height:1">✓</div>',
+        className:'', iconSize:[18,18], iconAnchor:[9,9]
+      });
+      marker = L.marker([p.lat, p.lng], {icon: visIcon}).addTo(_map);
+    } else {
+      marker = L.circleMarker([p.lat, p.lng], {
+        radius: 8, fillColor: color, color: '#000000',
+        weight: 2, opacity: 1, fillOpacity: 0.9
+      }).addTo(_map);
+    }
     var emoji = CAT_EMOJI[p.cat] || '📍';
     marker.bindPopup('<strong>'+p.name+'</strong><br><span style="color:#888;font-size:0.8em">'+emoji+' '+p.cat+(p.notes?' · '+p.notes:'')+'</span>'+(isVis?'<br><span style="color:#3DDC84;font-size:0.8em">✓ Visto</span>':''));
     marker.bindTooltip(p.name, {permanent: true, direction:'right', className:'map-label', offset:[6,0]});
