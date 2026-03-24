@@ -2420,7 +2420,7 @@ function openMap() {
     return '<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:'+catsUsed[c]+';display:inline-block"></span>'+c+'</span>';
   }).join('');
 
-  setTimeout(function(){ _map.invalidateSize(); }, 100);
+  setTimeout(function(){ _map.invalidateSize(); locateMe(); }, 100);
 }
 
 function closeMap() {
