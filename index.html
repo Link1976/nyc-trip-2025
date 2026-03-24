@@ -1886,7 +1886,7 @@ function processMapsNames() {
 }
 
 function buildLocalItinerary(days, pace, prio, dateVal) {
-  var maxPerDay = pace === 'relajado' ? 3 : pace === 'normal' ? 5 : 7;
+  var paceCap = pace === 'relajado' ? 3 : pace === 'normal' ? 5 : 7;
   var allNonVisited = places.filter(function(p){ return visited.indexOf(p.id) === -1; });
   var restByZone = {};
   allNonVisited.filter(function(p){ return p.cat === 'restaurante'; }).forEach(function(p){
@@ -1901,6 +1901,9 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
       if (i < days && lockedDays[d.key]) lockedIndices[i] = lockedDays[d.key].title || 'Plan privado';
     });
   }
+  // Distribute all sites across available days (never leave sites out)
+  var freeDays = days - Object.keys(lockedIndices).length;
+  var maxPerDay = Math.max(paceCap, freeDays > 0 ? Math.ceil(sorted.length / freeDays) : paceCap);
 
   if (prio === 'votos') {
     sorted.sort(function(a,b){ return b.votes - a.votes; });
@@ -2077,7 +2080,7 @@ function generateItinerary() {
     lockedInfo+'\n'+
     'Sitios (turismo, museos, compras, actividades):\n'+ptMain+'\n\n'+
     (ptRest?'Restaurantes disponibles (sugerirlos como opcionales segun la zona del dia, no como parte fija del itinerario):\n'+ptRest+'\n\n':'')+
-    'Genera itinerario dia a dia'+(dateVal?' desde el '+dateVal:'')+'. Para dias bloqueados muestra el plan fijo. Para el resto: zona principal, sitios en orden logico manana-tarde-noche, al final del dia sugiere 1-2 restaurantes de la zona como opciones para comer o cenar, 1 consejo para grupo con ninos. Encabezados DIA 1, DIA 2, etc. En espanol, conciso.';
+    'Genera itinerario dia a dia'+(dateVal?' desde el '+dateVal:'')+'. IMPORTANTE: intenta incluir TODOS los sitios de la lista distribuidos a lo largo de los dias. Para dias bloqueados muestra el plan fijo. Para el resto: zona principal, sitios en orden logico manana-tarde-noche, al final del dia sugiere 1-2 restaurantes de la zona como opciones para comer o cenar, 1 consejo para grupo con ninos. Encabezados DIA 1, DIA 2, etc. En espanol, conciso.';
 
   callGemini(prompt)
   .then(function(text){
