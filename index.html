@@ -1272,6 +1272,53 @@ function searchPlaces() {
     renderSearchResults();
   }
 
+  // ── Try Nominatim (OSM) — gratis, sin cuota ──────────────────────────────────
+  fill.style.width = '50%';
+  var nomQ = encodeURIComponent(query + ' New York City');
+  fetch('https://nominatim.openstreetmap.org/search?q='+nomQ+'&format=json&limit=6&countrycodes=us&addressdetails=1', {
+    headers: {'Accept-Language':'es,en', 'User-Agent':'nyc-trip-2025-app'}
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    var existing = places.map(function(p){ return p.name.toLowerCase(); });
+    var nomResults = (data||[])
+      .filter(function(r){ return r.lat && r.lon; })
+      .map(function(r){
+        var name = r.namedetails && r.namedetails.name ? r.namedetails.name : (r.display_name||'').split(',')[0].trim();
+        if (!name || name.length < 2) return null;
+        var lat = parseFloat(r.lat), lng = parseFloat(r.lon);
+        // zona por coordenadas
+        var zone = 'manhattan';
+        if (lat < 40.74 && lng < -73.83) zone = 'brooklyn';
+        else if (lng > -73.85) zone = 'queens';
+        else if (lat > 40.795) zone = 'bronx';
+        else if (lng < -74.05) zone = 'staten';
+        var addr = (r.display_name||'').split(',').slice(0,3).join(',').trim();
+        var cat = guessCat(name, r.type||'');
+        var isDup = existing.some(function(n){ return sim(n, name.toLowerCase()) > 0.75; });
+        return {name:name, zone:zone, cat:cat, addr:addr, desc:r.type||'', lat:lat, lng:lng, isDup:isDup};
+      })
+      .filter(function(x){ return x !== null; });
+
+    var combined = localResults.slice();
+    nomResults.forEach(function(r){
+      if (!combined.some(function(c){ return sim(c.name.toLowerCase(), r.name.toLowerCase()) > 0.7; }))
+        combined.push(r);
+    });
+    if (combined.length > 0) {
+      searchResults = combined;
+      renderSearchResults();
+      fill.style.width='100%';
+      toast(combined.length+' sitios encontrados');
+      btn.disabled=false; btn.textContent='Buscar';
+      setTimeout(function(){ prog.style.display='none'; fill.style.width='0'; },400);
+      return;
+    }
+    tryGemini();
+  })
+  .catch(function(){ tryGemini(); });
+
+  function tryGemini() {
   // ── Try Gemini if key is configured ──────────────────────────────────────────
   if (!getApiKey()) {
     fill.style.width = '100%';
@@ -1347,6 +1394,7 @@ function searchPlaces() {
     btn.disabled = false; btn.textContent = 'Buscar';
     setTimeout(function() { prog.style.display = 'none'; fill.style.width = '0'; }, 400);
   });
+  } // end tryGemini
 }
 
 function searchLocal(query) {
