@@ -1071,8 +1071,8 @@ function load() {
         places = data;
         places.forEach(function(p){
           enrichPlace(p);
-          // re-inferir categoria si es 'otro' (sitios importados sin cat correcta)
-          if (!p.cat || p.cat === 'otro') p.cat = guessCat(p.name, p.notes||'');
+          // re-inferir categoria siempre (guessCat mejorado cubre mas casos)
+          p.cat = guessCat(p.name, p.notes||'');
         });
         try { localStorage.setItem(SK, JSON.stringify(places)); } catch(e) {}
         render();
@@ -2005,26 +2005,38 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
     return dayPlan;
   }
 
+  // Separar turismo y tiendas para distribuir equitativamente cada dia
+  var SIGHT_CATS = ['museo','foto','cultura','parque','actividad'];
+  var SHOP_CATS  = ['compras','mercado'];
+  var sightPool = sorted.filter(function(p){ return SIGHT_CATS.indexOf(p.cat) > -1; });
+  var shopPool  = sorted.filter(function(p){ return SHOP_CATS.indexOf(p.cat) > -1; });
+  var otherPool = sorted.filter(function(p){ return SIGHT_CATS.indexOf(p.cat) === -1 && SHOP_CATS.indexOf(p.cat) === -1; });
+
+  var freeDays = Math.max(days - Object.keys(lockedIndices).length, 1);
+  var sightPerDay = Math.max(3, Math.ceil((sightPool.length + otherPool.length) / freeDays));
+  var shopPerDay  = Math.max(1, Math.ceil(shopPool.length / freeDays));
+
   var dayPlan = [];
-  var used = 0;
+  var usedSight = 0, usedShop = 0;
   for (var d = 0; d < days; d++) {
     if (lockedIndices[d] !== undefined) {
       dayPlan.push({ locked: true, lockedTitle: lockedIndices[d], items: [] });
       continue;
     }
-    var batch = sorted.slice(used, used + maxPerDay);
+    var sightBatch = sightPool.concat(otherPool).slice(usedSight, usedSight + sightPerDay);
+    var shopBatch  = shopPool.slice(usedShop, usedShop + shopPerDay);
+    var batch = sightBatch.concat(shopBatch);
     if (!batch.length) {
-      // sin sitios — seguir solo si hay dias bloqueados por delante
       if (Object.keys(lockedIndices).some(function(k){ return parseInt(k) > d; })) continue;
       break;
     }
     var zoneCounts = {};
     batch.forEach(function(p){ zoneCounts[p.zone] = (zoneCounts[p.zone]||0) + 1; });
-    var mainZone = 'manhattan';
-    var maxC = 0;
+    var mainZone = 'manhattan', maxC = 0;
     for (var z in zoneCounts) { if (zoneCounts[z] > maxC) { maxC = zoneCounts[z]; mainZone = z; } }
     dayPlan.push({ zone: mainZone, items: batch, rests: (restByZone[mainZone]||[]).slice(0,2) });
-    used += maxPerDay;
+    usedSight += sightPerDay;
+    usedShop  += shopPerDay;
   }
   return dayPlan;
 }
@@ -2229,7 +2241,7 @@ function toast(msg) {
 }
 
 load(); render();
-try{document.getElementById('cfg-date').value='2026-03-29';}catch(e){}
+try{document.getElementById('cfg-date').value='2026-03-28';}catch(e){}
 renderLockDays();
 
 // Show sync status
