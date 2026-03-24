@@ -1192,7 +1192,7 @@ function renderPlaces() {
     return '<div class="place-card'+(vis?' visited-card':'')+'">'+
       '<button class="del-btn" onclick="del('+p.id+')">&#x2715;</button>'+
       '<span class="zone-badge z-'+p.zone+'">'+ZL[p.zone]+'</span>'+
-      '<span class="cat-badge">'+p.cat+'</span>'+
+      '<span class="cat-badge" onclick="cycleCat('+p.id+')" title="Cambiar categoria" style="cursor:pointer">'+CAT_EMOJI[p.cat]+' '+p.cat+'</span>'+
       '<div class="place-name">'+esc(p.name)+'</div>'+
       (p.addr?'<div class="place-addr">'+esc(p.addr)+'</div>':'')+
       (p.notes?'<div class="place-notes">'+esc(p.notes)+'</div>':'')+
@@ -1513,6 +1513,15 @@ function setFilter(z, btn) {
   filter = z;
   document.querySelectorAll('#zone-filters .filter-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active'); renderPlaces();
+}
+
+function cycleCat(id) {
+  var p = places.find(function(x){ return x.id === id; });
+  if (!p) return;
+  var idx = VC.indexOf(p.cat);
+  p.cat = VC[(idx + 1) % VC.length];
+  save(); renderPlaces();
+  toast('"'+p.name+'" → '+CAT_EMOJI[p.cat]+' '+p.cat);
 }
 
 function setCatFilter(c, btn) {
