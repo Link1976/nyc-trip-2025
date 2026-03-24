@@ -1100,8 +1100,8 @@ function load() {
         places = data;
         places.forEach(function(p){
           enrichPlace(p);
-          // re-inferir categoria siempre (guessCat mejorado cubre mas casos)
-          p.cat = guessCat(p.name, p.notes||'');
+          // solo inferir categoria si no tiene ninguna (respetar cambios manuales)
+          if (!p.cat) p.cat = guessCat(p.name, p.notes||'');
         });
         try { localStorage.setItem(SK, JSON.stringify(places)); } catch(e) {}
         render();
