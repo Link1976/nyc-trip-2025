@@ -379,12 +379,12 @@
     <!-- Google Maps URL (ancho completo) -->
     <div class="card" style="margin-bottom:14px">
       <div class="card-title">&#128205; Itinerario de Google Maps</div>
-      <p style="font-size:0.75rem;color:#555;margin-bottom:10px;line-height:1.6">Pega el enlace de una ruta o itinerario de Google Maps y extraeremos los sitios automaticamente.</p>
+      <p style="font-size:0.75rem;color:#555;margin-bottom:10px;line-height:1.6">Pega el enlace de una ruta, lista guardada o tour de Google Maps y extraeremos los sitios automaticamente.</p>
       <div class="search-box">
-        <input type="url" id="gmaps-url" placeholder="https://www.google.com/maps/dir/Times+Square/Central+Park/..." />
+        <input type="url" id="gmaps-url" placeholder="https://www.google.com/maps/..." />
         <button class="btn btn-red btn-inline" id="gmaps-btn" onclick="importFromMaps()">Importar</button>
       </div>
-      <p style="font-size:0.72rem;color:#444;margin-top:6px;line-height:1.5">Funciona con rutas (maps/dir/...) y tambien con listas compartidas. En Google Maps: menu &#8250; Compartir &#8250; Copiar enlace.</p>
+      <p style="font-size:0.72rem;color:#444;margin-top:6px;line-height:1.5">Funciona con rutas (maps/dir/...), listas guardadas y tours compartidos. En Google Maps: menu &#8250; Compartir &#8250; Copiar enlace.</p>
     </div>
 
     <!-- Resultados detectados (ancho completo) -->
@@ -544,6 +544,24 @@ function callGemini(prompt) {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({contents:[{parts:[{text: prompt}]}]})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if (data.error) throw new Error(data.error.message);
+    return _geminiText(data);
+  });
+}
+
+function callGeminiWithSearch(prompt) {
+  var key = getApiKey();
+  if (!key) return Promise.reject(new Error('Sin API key'));
+  return fetch(GEMINI_URL + key, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      contents: [{parts: [{text: prompt}]}],
+      tools: [{google_search: {}}]
+    })
   })
   .then(function(r){return r.json();})
   .then(function(data){
@@ -1778,9 +1796,15 @@ function importFromMaps() {
     }
   }
 
-  // Fallback: send URL to Gemini to extract place names
-  btn.disabled=true; btn.textContent='Analizando...';
-  callGemini('Esta es una URL de Google Maps compartida:\n'+url+'\n\nExtrae todos los nombres de lugares de Nueva York que puedas identificar. Devuelve UNA linea por sitio:\nNOMBRE|ZONA|CATEGORIA\nZONA: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos.')
+  // Detect list/tour URL (maps/@coords/data=... with encoded token)
+  var isListOrTour = /maps\/@[\d.,]+\/data=/.test(url) || /maps\/placesshared/.test(url);
+  var geminiPrompt = isListOrTour
+    ? 'Visita este enlace de Google Maps y extrae TODOS los lugares de Nueva York que contiene la lista o tour:\n'+url+'\n\nDevuelve UNA linea por sitio en este formato exacto:\nNOMBRE|ZONA|CATEGORIA\nZONA debe ser: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA debe ser: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos, sin texto adicional ni encabezados.'
+    : 'Esta es una URL de Google Maps compartida:\n'+url+'\n\nExtrae todos los nombres de lugares de Nueva York que puedas identificar. Devuelve UNA linea por sitio:\nNOMBRE|ZONA|CATEGORIA\nZONA: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos.';
+  var callFn = isListOrTour ? callGeminiWithSearch : callGemini;
+
+  btn.disabled=true; btn.textContent=isListOrTour?'Buscando lista...':'Analizando...';
+  callFn(geminiPrompt)
   .then(function(raw){
     var parsed=raw.split('\n').map(function(l){return l.trim();})
       .filter(function(l){return l.indexOf('|')>-1;})
