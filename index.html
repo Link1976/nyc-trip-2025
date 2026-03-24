@@ -2314,6 +2314,15 @@ function openMap() {
     catsUsed[p.cat] = color;
   });
 
+  // Pin del hotel
+  var hotelIcon = L.divIcon({
+    html: '<div style="background:#F7E733;color:#0A0A0A;font-weight:900;font-size:0.75rem;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #0A0A0A;box-shadow:0 2px 8px rgba(0,0,0,0.6);font-family:sans-serif">H</div>',
+    className:'', iconSize:[28,28], iconAnchor:[14,14]
+  });
+  L.marker([HOTEL.lat, HOTEL.lng], {icon: hotelIcon, zIndexOffset: 1000})
+    .addTo(_map)
+    .bindPopup('<strong>🏨 Hotel</strong><br><span style="color:#888;font-size:0.8em">INNSiDE by Meliá New York NOMAD</span>');
+
   if (bounds.length) _map.fitBounds(bounds, {padding:[24,24]});
 
   // Leyenda
