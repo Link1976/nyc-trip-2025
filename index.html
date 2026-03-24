@@ -980,6 +980,37 @@ function enrichPlace(p) {
   return p;
 }
 
+var _geocoding = false;
+function geocodeMissing() {
+  if (_geocoding) return;
+  var toGeo = places.filter(function(p){ return !p.lat || !p.lng; });
+  if (!toGeo.length) return;
+  _geocoding = true;
+  var i = 0;
+  function next() {
+    if (i >= toGeo.length) { _geocoding = false; return; }
+    var p = toGeo[i++];
+    // skip if already got coords (may have been enriched by another client)
+    if (p.lat && p.lng) { setTimeout(next, 50); return; }
+    var q = encodeURIComponent(p.name + ', New York City');
+    fetch('https://nominatim.openstreetmap.org/search?q='+q+'&format=json&limit=1&countrycodes=us', {
+      headers: {'Accept-Language':'en','User-Agent':'nyc-trip-2025-app'}
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (data && data[0]) {
+        p.lat = parseFloat(data[0].lat);
+        p.lng = parseFloat(data[0].lon);
+        if (!p.addr && data[0].display_name) p.addr = data[0].display_name.split(',').slice(0,3).join(',').trim();
+        save();
+      }
+    })
+    .catch(function(){})
+    .finally(function(){ setTimeout(next, 1200); }); // respeta limite 1 req/s de Nominatim
+  }
+  next();
+}
+
 // Firebase init
 var firebaseConfig = {
   apiKey: "AIzaSyD8KniYNOlkAR7iropfzbq_IE_R58cMkkQ",
@@ -1040,6 +1071,7 @@ function load() {
         places.forEach(function(p){ enrichPlace(p); });
         try { localStorage.setItem(SK, JSON.stringify(places)); } catch(e) {}
         render();
+        geocodeMissing();
       }
     });
     fbDb.ref('voted').on('value', function(snapshot) {
@@ -1699,6 +1731,7 @@ function confirmImport() {
     places.push(np);
   });
   save(); render(); clearExtracted();
+  geocodeMissing();
   document.getElementById('import-text').value='';
   toast(newOnes.length+' sitios anadidos');
   switchTab('places',document.querySelectorAll('.tab-btn')[0]);
