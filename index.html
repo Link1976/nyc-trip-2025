@@ -604,8 +604,9 @@ var VK = 'nyc_voted_v3';
 var ZL = { manhattan:'Manhattan', brooklyn:'Brooklyn', queens:'Queens', bronx:'El Bronx', staten:'Staten Island' };
 var ZC = { manhattan:'#4A90E2', brooklyn:'#9B59B6', queens:'#27AE60', bronx:'#E67E22', staten:'#E74C3C' };
 var VZ = ['manhattan','brooklyn','queens','bronx','staten'];
-var VC = ['museo','parque','restaurante','compras','cultura','actividad','foto','transporte','otro'];
-var CAT_EMOJI = {museo:'🏛',parque:'🌳',restaurante:'🍽',compras:'🛍',cultura:'🎭',actividad:'🎡',foto:'📸',transporte:'🚇',otro:'📍'};
+var VC = ['museo','parque','restaurante','compras','cultura','actividad','foto','mercado','transporte','otro'];
+var CAT_EMOJI = {museo:'🏛',parque:'🌳',restaurante:'🍽',compras:'🛍',cultura:'🎭',actividad:'🎡',foto:'📸',mercado:'🏪',transporte:'🚇',otro:'📍'};
+var HOTEL = {lat:40.7476, lng:-73.9961}; // INNSiDE by Meliá, Midtown
 var SEED = [
   {id:1,name:'Central Park',zone:'manhattan',cat:'parque',notes:'Perfecto para ninos, bici o a pie',who:'Maria',votes:3},
   {id:2,name:'Top of the Rock',zone:'manhattan',cat:'foto',notes:'Mejores vistas, menos cola que Empire State',who:'Carlos',votes:5},
@@ -1068,7 +1069,11 @@ function load() {
       var data = snapshot.val();
       if (data && data.length) {
         places = data;
-        places.forEach(function(p){ enrichPlace(p); });
+        places.forEach(function(p){
+          enrichPlace(p);
+          // re-inferir categoria si es 'otro' (sitios importados sin cat correcta)
+          if (!p.cat || p.cat === 'otro') p.cat = guessCat(p.name, p.notes||'');
+        });
         try { localStorage.setItem(SK, JSON.stringify(places)); } catch(e) {}
         render();
         geocodeMissing();
@@ -1567,27 +1572,36 @@ function guessZone(text) {
 function guessCat(nameOnly, fullText) {
   var n = nameOnly.toLowerCase();
   var t = fullText.toLowerCase();
-  if (n.indexOf('museum')>-1||n.indexOf('museo')>-1||n.indexOf('gallery')>-1||n.indexOf('galeria')>-1) return 'museo';
-  if (n.indexOf('store')>-1||n.indexOf('shop')>-1||n.indexOf('flagship')>-1||
-      n.indexOf('nike')>-1||n.indexOf('adidas')>-1||n.indexOf('lego')>-1||
-      n.indexOf('apple')>-1||n.indexOf('ray-ban')>-1||n.indexOf('fao')>-1||
-      n.indexOf('kith')>-1||n.indexOf('noah')>-1||n.indexOf('only ny')>-1) return 'compras';
-  if (t.indexOf('tienda')>-1||t.indexOf('ropa')>-1||t.indexOf('zapatillas')>-1||
-      t.indexOf('sneaker')>-1||t.indexOf('comprar')>-1||t.indexOf('jugueteria')>-1||
-      t.indexOf('decoracion')>-1||t.indexOf('design store')>-1||t.indexOf('marca')>-1||
-      t.indexOf('camisetas')>-1) return 'compras';
-  if (n.indexOf('park')>-1&&n.indexOf('parking')<0) return 'parque';
-  if (n.indexOf('nba')>-1||n.indexOf('mlb')>-1||n.indexOf('golf')>-1||
-      n.indexOf('nintendo')>-1) return 'actividad';
-  if (t.indexOf('jugar')>-1||t.indexOf('deporte')>-1||t.indexOf('playa')>-1||
-      t.indexOf('beach')>-1||t.indexOf('zoo')>-1||t.indexOf('aventura')>-1) return 'actividad';
-  if (n.indexOf('deli')>-1||n.indexOf('pizza')>-1||n.indexOf('cafe')>-1||
-      n.indexOf('bakery')>-1||n.indexOf('restaurant')>-1) return 'restaurante';
-  if (t.indexOf('restaurante')>-1||t.indexOf('comida')>-1||t.indexOf('food')>-1||
-      t.indexOf('comer')>-1) return 'restaurante';
-  if (t.indexOf('mirador')>-1||t.indexOf('vista')>-1||n.indexOf('top of')>-1||
-      t.indexOf('observat')>-1||t.indexOf('foto')>-1||n.indexOf('bridge')>-1) return 'foto';
-  if (t.indexOf('teatro')>-1||t.indexOf('theater')>-1||t.indexOf('musical')>-1) return 'cultura';
+  // Museo
+  if (/museum|museo|memorial|gallery|galeria|banksy|intrepid|spyscape|planetario/.test(n)) return 'museo';
+  // Mercado (antes que restaurante)
+  if (/market|mercado|eataly|food hall|little spain|chelsea market|pier 17/.test(n)) return 'mercado';
+  // Actividad (estadios, atracciones, tours)
+  if (/barclays|madison square garden|carousel|carrusel|helicopters|experience|friends™|teleférico|telef.rico|cable car|ferry|zoo|acuario|aquarium|luna park/.test(n)) return 'actividad';
+  if (/nba|mlb|nfl|golf|nintendo|bowling|arcade|escape room/.test(n)) return 'actividad';
+  // Compras
+  if (/store|shop|flagship|vuitton|louis vuitton|kpop|nara|nike|adidas|lego|apple|ray-ban|fao|kith|noah|only ny|crumbl|zara|uniqlo|macy/.test(n)) return 'compras';
+  if (/tienda|ropa|zapatillas|sneaker|comprar|jugueteria|decoracion|design store|marca|camisetas/.test(t)) return 'compras';
+  // Parque / espacios exteriores
+  if (/botanical|botánico|botánica|botanic/.test(n)) return 'parque';
+  if (/park|parque/.test(n) && !/parking|skatepark/.test(n)) return 'parque';
+  if (/meadow|promenade|lawn|fields|garden|jardin|high line|little island|battery/.test(n)) return 'parque';
+  if (/mall and literary|cherry blossom|sheep meadow|strawberry fields/.test(n)) return 'parque';
+  // Foto / miradores / monumentos / esculturas
+  if (/observatory|observatorio|lookout|top of|one world|summit/.test(n)) return 'foto';
+  if (/bridge|puente|brooklyn bridge lookout/.test(n)) return 'foto';
+  if (/statue|estatua|escultura|sculpture|bull|toro|alicia|alice|charging|liberty lookout|dumbo/.test(n)) return 'foto';
+  if (/wall street|times square/.test(n)) return 'foto';
+  if (/mirador|vistas|observat/.test(t)) return 'foto';
+  // Cultura (teatro, música, historia, religión, educación)
+  if (/teatro|theater|theatre|apollo|broadway/.test(n)) return 'cultura';
+  if (/jazz|birdland|music hall|carnegie/.test(n)) return 'cultura';
+  if (/columbia|universidad|university|college/.test(n)) return 'cultura';
+  if (/grand central|iglesia|church|trinity|cathedral|biblioteca|library/.test(n)) return 'cultura';
+  if (/channel gardens|rockefeller|flatiron|chrysler|dakota|empire state|edificio/.test(n)) return 'cultura';
+  // Restaurante
+  if (/deli|pizza|cafe|café|bakery|restaurant|papaya|shake shack|sushi|burger|bbq|steakhouse/.test(n)) return 'restaurante';
+  if (/restaurante|comida|food|comer|galletas|perrito|heladeria/.test(t)) return 'restaurante';
   return 'otro';
 }
 
@@ -2011,16 +2025,18 @@ function optimizeRoute(items) {
   var withCoords = items.filter(function(p){ return p.lat && p.lng; });
   var noCoords = items.filter(function(p){ return !p.lat || !p.lng; });
   if (withCoords.length < 2) return items;
-  var result = [withCoords[0]];
-  var remaining = withCoords.slice(1);
+  var result = [];
+  var remaining = withCoords.slice();
+  var current = HOTEL; // empezar siempre desde el hotel
   while (remaining.length > 0) {
-    var last = result[result.length-1];
     var nearestIdx = 0, nearestDist = Infinity;
     remaining.forEach(function(p, i){
-      var d = Math.pow(p.lat-last.lat,2) + Math.pow(p.lng-last.lng,2);
+      var d = Math.pow(p.lat-current.lat,2) + Math.pow(p.lng-current.lng,2);
       if (d < nearestDist) { nearestDist=d; nearestIdx=i; }
     });
-    result.push(remaining.splice(nearestIdx,1)[0]);
+    var next = remaining.splice(nearestIdx,1)[0];
+    result.push(next);
+    current = next;
   }
   return result.concat(noCoords);
 }
