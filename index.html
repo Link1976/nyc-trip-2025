@@ -1803,7 +1803,7 @@ function importFromMaps() {
   }
 
   // Detect list/tour URL (maps/@coords/data=... with encoded token)
-  var isListOrTour = /maps\/@[\d.,]+\/data=/.test(url) || /maps\/placesshared/.test(url);
+  var isListOrTour = /maps\/@[^/]+\/data=/.test(url) || /maps\/placesshared/.test(url);
   if (isListOrTour) {
     document.getElementById('maps-open-link').href = url;
     document.getElementById('maps-manual-box').style.display = 'block';
