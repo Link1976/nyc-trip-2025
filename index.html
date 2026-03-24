@@ -363,6 +363,17 @@
       <button class="filter-btn" onclick="setFilter('visited',this)" style="color:#3DDC84;border-color:#3DDC8444">&#10003; Vistos</button>
       <button class="filter-btn" onclick="setFilter('pending',this)">Pendientes</button>
     </div>
+    <div class="filters" id="cat-filters" style="margin-top:-6px">
+      <button class="filter-btn active" onclick="setCatFilter('all',this)">Todos</button>
+      <button class="filter-btn" onclick="setCatFilter('museo',this)" style="color:#34d399;border-color:#34d39944">🏛 Museo</button>
+      <button class="filter-btn" onclick="setCatFilter('parque',this)" style="color:#4ade80;border-color:#4ade8044">🌳 Parque</button>
+      <button class="filter-btn" onclick="setCatFilter('foto',this)" style="color:#f472b6;border-color:#f472b644">📸 Foto</button>
+      <button class="filter-btn" onclick="setCatFilter('cultura',this)" style="color:#60a5fa;border-color:#60a5fa44">🎭 Cultura</button>
+      <button class="filter-btn" onclick="setCatFilter('actividad',this)" style="color:#facc15;border-color:#facc1544">🎡 Actividad</button>
+      <button class="filter-btn" onclick="setCatFilter('compras',this)" style="color:#c084fc;border-color:#c084fc44">🛍 Compras</button>
+      <button class="filter-btn" onclick="setCatFilter('mercado',this)" style="color:#fb923c;border-color:#fb923c44">🏪 Mercado</button>
+      <button class="filter-btn" onclick="setCatFilter('restaurante',this)" style="color:#f97316;border-color:#f9731644">🍽 Restaurante</button>
+    </div>
 
     <div class="places-grid" id="places-grid"></div>
   </div>
@@ -640,7 +651,7 @@ var places = [];
 var voted = [];
 var visited = [];
 var filter = 'all';
-var tagFilter = 'all';
+var catFilter = 'all';
 var extracted = [];
 var lockedDays = {}; // { 'YYYY-MM-DD': { title: string } }
 
@@ -1165,7 +1176,7 @@ function renderPlaces() {
              filter === 'visited' ? places.filter(function(p){ return visited.indexOf(p.id) > -1; }) :
              filter === 'pending' ? places.filter(function(p){ return visited.indexOf(p.id) === -1; }) :
              places.filter(function(p){ return p.zone === filter; });
-  if (tagFilter !== 'all') list = list.filter(function(p){ return p.tag === tagFilter; });
+  if (catFilter !== 'all') list = list.filter(function(p){ return p.cat === catFilter; });
   list.sort(function(a,b){
     var av = visited.indexOf(a.id) > -1, bv = visited.indexOf(b.id) > -1;
     if (av !== bv) return av ? 1 : -1; // visited al final
@@ -1504,9 +1515,9 @@ function setFilter(z, btn) {
   btn.classList.add('active'); renderPlaces();
 }
 
-function setTagFilter(t, btn) {
-  tagFilter = t;
-  document.querySelectorAll('#tag-filters .filter-btn').forEach(function(b){b.classList.remove('active');});
+function setCatFilter(c, btn) {
+  catFilter = c;
+  document.querySelectorAll('#cat-filters .filter-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active'); renderPlaces();
 }
 
