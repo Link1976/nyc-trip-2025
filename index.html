@@ -299,7 +299,10 @@
 <div id="map-modal">
   <div id="map-modal-header">
     <h2>📍 Todos los sitios</h2>
-    <button id="map-modal-close" onclick="closeMap()">✕</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="locate-btn" onclick="locateMe()" style="background:none;border:1px solid #444;color:#aaa;font-size:0.75rem;padding:4px 10px;border-radius:6px;cursor:pointer">📡 Ubicación</button>
+      <button id="map-modal-close" onclick="closeMap()">✕</button>
+    </div>
   </div>
   <div id="map-container"></div>
   <div id="map-legend"></div>
@@ -2422,6 +2425,30 @@ function openMap() {
 
 function closeMap() {
   document.getElementById('map-modal').classList.remove('open');
+}
+
+var _locationMarker = null, _locationCircle = null;
+function locateMe() {
+  if (!navigator.geolocation) { toast('Tu navegador no soporta geolocalización'); return; }
+  var btn = document.getElementById('locate-btn');
+  btn.textContent = '⏳ Buscando...'; btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
+      if (_locationMarker) { _map.removeLayer(_locationMarker); _map.removeLayer(_locationCircle); }
+      _locationCircle = L.circle([lat, lng], {radius: acc, color:'#4A90E2', fillColor:'#4A90E2', fillOpacity:0.15, weight:1}).addTo(_map);
+      var locIcon = L.divIcon({
+        html: '<div style="width:16px;height:16px;border-radius:50%;background:#4A90E2;border:3px solid #fff;box-shadow:0 0 0 2px #4A90E2;"></div>',
+        className:'', iconSize:[16,16], iconAnchor:[8,8]
+      });
+      _locationMarker = L.marker([lat, lng], {icon: locIcon, zIndexOffset:2000}).addTo(_map)
+        .bindPopup('<strong>📡 Estás aquí</strong><br><span style="color:#888;font-size:0.8em">Precisión: ±'+Math.round(acc)+'m</span>').openPopup();
+      _map.setView([lat, lng], 15);
+      btn.textContent = '📡 Ubicación'; btn.disabled = false;
+    },
+    function() { toast('No se pudo obtener tu ubicación'); btn.textContent = '📡 Ubicación'; btn.disabled = false; },
+    {enableHighAccuracy: true, timeout: 10000}
+  );
 }
 
 load(); render();
