@@ -220,6 +220,7 @@
   .tag-turismo    { background:rgba(26,115,232,0.18); color:#6ab0ff; border:1px solid rgba(26,115,232,0.5); }
   .tag-shopping   { background:rgba(155,89,182,0.18); color:#c07aff; border:1px solid rgba(155,89,182,0.5); }
   .tag-restaurante{ background:rgba(230,126,34,0.18); color:#ff9f4a; border:1px solid rgba(230,126,34,0.5); }
+  .tag-museo      { background:rgba(52,211,153,0.18); color:#34d399; border:1px solid rgba(52,211,153,0.5); }
 
   /* ── Locked days ─────────────────────────────────────────────────────────── */
   .lock-days-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
@@ -330,6 +331,7 @@
       <button class="filter-btn active" onclick="setTagFilter('all',this)">&#9632; Todos</button>
       <button class="filter-btn" onclick="setTagFilter('turismo',this)" style="color:#6ab0ff;border-color:#1A73E844">Turismo</button>
       <button class="filter-btn" onclick="setTagFilter('shopping',this)" style="color:#c07aff;border-color:#9B59B644">Shopping</button>
+      <button class="filter-btn" onclick="setTagFilter('museo',this)" style="color:#34d399;border-color:#34d39944">Museo</button>
       <button class="filter-btn" onclick="setTagFilter('restaurante',this)" style="color:#ff9f4a;border-color:#E67E2244">Restaurante</button>
     </div>
 
@@ -594,11 +596,12 @@ var extracted = [];
 var lockedDays = {}; // { 'YYYY-MM-DD': { title: string } }
 
 // Tags
-var TAGS = ['turismo','shopping','restaurante'];
-var TAG_LABELS = { turismo:'Turismo', shopping:'Shopping', restaurante:'Restaurante' };
+var TAGS = ['turismo','shopping','restaurante','museo'];
+var TAG_LABELS = { turismo:'Turismo', shopping:'Shopping', restaurante:'Restaurante', museo:'Museo' };
 function catToTag(cat) {
   if (cat === 'restaurante') return 'restaurante';
   if (cat === 'compras') return 'shopping';
+  if (cat === 'museo') return 'museo';
   return 'turismo';
 }
 
