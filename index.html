@@ -290,6 +290,8 @@
   #map-container { flex:1; min-height:0; }
   #map-legend { display:flex; flex-wrap:wrap; gap:8px; padding:8px 12px; background:var(--gray); border-top:1px solid var(--mid); flex-shrink:0; font-size:0.72rem; }
   #map-legend span { color:#bbb; }
+  .map-label { background:rgba(10,10,10,0.82) !important; border:none !important; box-shadow:none !important; color:#F5F4EE !important; font-size:0.68rem !important; font-family:'DM Sans',sans-serif !important; padding:2px 5px !important; border-radius:3px !important; white-space:nowrap !important; }
+  .map-label::before { display:none !important; }
 </style>
 </head>
 <body>
@@ -2282,9 +2284,10 @@ function toast(msg) {
 }
 
 // ── Mapa Leaflet ─────────────────────────────────────────────────────────────
-var _map = null;
+var _map = null, _mapMarkers = [];
 var CAT_COLOR = {museo:'#34d399',parque:'#4ade80',restaurante:'#f97316',compras:'#c084fc',
   cultura:'#60a5fa',actividad:'#facc15',foto:'#f472b6',mercado:'#fb923c',transporte:'#94a3b8',otro:'#9ca3af'};
+var LABEL_ZOOM = 14; // zoom minimo para mostrar nombres
 
 function openMap() {
   var modal = document.getElementById('map-modal');
@@ -2296,7 +2299,8 @@ function openMap() {
     }).addTo(_map);
   }
   // Limpiar markers previos
-  _map.eachLayer(function(l){ if (l instanceof L.Marker || l instanceof L.CircleMarker) _map.removeLayer(l); });
+  _mapMarkers.forEach(function(m){ _map.removeLayer(m); });
+  _mapMarkers = [];
 
   var bounds = [];
   var catsUsed = {};
@@ -2305,13 +2309,15 @@ function openMap() {
     var color = CAT_COLOR[p.cat] || '#9ca3af';
     var isVis = visited.indexOf(p.id) > -1;
     var marker = L.circleMarker([p.lat, p.lng], {
-      radius: 8, fillColor: color, color: isVis ? '#ffffff' : color,
-      weight: isVis ? 2 : 1, opacity: 0.9, fillOpacity: isVis ? 0.4 : 0.85
+      radius: 8, fillColor: color, color: '#0A0A0A',
+      weight: 1.5, opacity: 1, fillOpacity: isVis ? 0.35 : 0.9
     }).addTo(_map);
     var emoji = CAT_EMOJI[p.cat] || '📍';
     marker.bindPopup('<strong>'+p.name+'</strong><br><span style="color:#888;font-size:0.8em">'+emoji+' '+p.cat+(p.notes?' · '+p.notes:'')+'</span>'+(isVis?'<br><span style="color:#3DDC84;font-size:0.8em">✓ Visto</span>':''));
+    marker.bindTooltip(p.name, {permanent: true, direction:'right', className:'map-label', offset:[6,0]});
     bounds.push([p.lat, p.lng]);
     catsUsed[p.cat] = color;
+    _mapMarkers.push(marker);
   });
 
   // Pin del hotel
@@ -2324,6 +2330,17 @@ function openMap() {
     .bindPopup('<strong>🏨 Hotel</strong><br><span style="color:#888;font-size:0.8em">INNSiDE by Meliá New York NOMAD</span>');
 
   if (bounds.length) _map.fitBounds(bounds, {padding:[24,24]});
+
+  // Mostrar/ocultar labels segun zoom
+  function updateLabels() {
+    var show = _map.getZoom() >= LABEL_ZOOM;
+    _mapMarkers.forEach(function(m){
+      var tt = m.getTooltip();
+      if (tt) { if (show) tt.addTo(_map); else tt.remove(); }
+    });
+  }
+  _map.off('zoomend', updateLabels).on('zoomend', updateLabels);
+  updateLabels();
 
   // Leyenda
   var legend = document.getElementById('map-legend');
