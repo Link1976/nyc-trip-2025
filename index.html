@@ -147,6 +147,12 @@
   .maps-route { display: block; background: #1A73E8; color: white; font-size: 0.82rem; font-weight: 700; padding: 10px 16px; border-radius: 8px; text-decoration: none; text-align: center; margin-top: 10px; font-family: 'DM Sans', sans-serif; }
   .maps-route:hover { background: #1557B0; }
   .day-block li .maps-link { margin-top: 4px; }
+  #maps-manual-box { display:none; margin-top:10px; border-top:1px solid var(--mid); padding-top:10px; }
+  #maps-manual-box .option-label { font-size:0.72rem; font-weight:700; color:var(--black); margin:10px 0 5px; text-transform:uppercase; letter-spacing:0.5px; }
+  #maps-manual-box .option-hint { font-size:0.72rem; color:#555; margin-bottom:6px; line-height:1.5; }
+  #maps-manual-box textarea { width:100%; box-sizing:border-box; height:90px; border:1px solid var(--mid); border-radius:8px; padding:8px; font-size:0.78rem; font-family:'DM Sans',sans-serif; resize:vertical; background:var(--gray); color:var(--black); }
+  .maps-screenshot-drop { border:2px dashed var(--mid); border-radius:8px; padding:14px; text-align:center; cursor:pointer; font-size:0.78rem; color:#666; margin-bottom:6px; }
+  .maps-screenshot-drop:hover { border-color:var(--yellow); color:var(--black); }
 
   .place-card { background: var(--gray); border: 1px solid var(--mid); border-radius: 10px; padding: 14px; position: relative; }
   .zone-badge { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 2px 7px; border-radius: 4px; display: inline-block; color: white; }
@@ -384,7 +390,24 @@
         <input type="url" id="gmaps-url" placeholder="https://www.google.com/maps/..." />
         <button class="btn btn-red btn-inline" id="gmaps-btn" onclick="importFromMaps()">Importar</button>
       </div>
-      <p style="font-size:0.72rem;color:#444;margin-top:6px;line-height:1.5">Funciona con rutas (maps/dir/...), listas guardadas y tours compartidos. En Google Maps: menu &#8250; Compartir &#8250; Copiar enlace.</p>
+      <p style="font-size:0.72rem;color:#444;margin-top:6px;line-height:1.5">Rutas (maps/dir/...) se importan automaticamente. Para listas o tours, pega la URL y sigue las instrucciones.</p>
+      <!-- Fallback for lists/tours -->
+      <div id="maps-manual-box">
+        <p class="option-hint">&#128274; Las listas y tours de Google Maps requieren JavaScript para renderizarse y no son accesibles automaticamente. Usa una de estas opciones:</p>
+        <a id="maps-open-link" href="#" target="_blank" rel="noopener" class="btn btn-outline" style="display:inline-block;margin-bottom:10px;font-size:0.75rem">&#128279; Abrir lista en Google Maps</a>
+
+        <div class="option-label">Opcion 1 — Captura de pantalla (recomendado)</div>
+        <p class="option-hint">Haz una captura de la lista/tour en Google Maps y subela. Gemini Vision extraera los sitios automaticamente.</p>
+        <div class="maps-screenshot-drop" onclick="document.getElementById('maps-screenshot-input').click()">
+          &#128247; Pulsa para subir captura de pantalla
+          <input type="file" id="maps-screenshot-input" accept="image/*" style="display:none" onchange="importFromMapsScreenshot(this.files[0])">
+        </div>
+
+        <div class="option-label">Opcion 2 — Pegar nombres</div>
+        <p class="option-hint">Abre la lista en Maps, copia los nombres y pegaios aqui (uno por linea):</p>
+        <textarea id="maps-manual-names" placeholder="The Metropolitan Museum of Art&#10;Central Park&#10;Brooklyn Bridge&#10;..."></textarea>
+        <button class="btn btn-red" style="margin-top:8px;width:100%" onclick="processMapsNames()">Procesar nombres</button>
+      </div>
     </div>
 
     <!-- Resultados detectados (ancho completo) -->
@@ -552,23 +575,6 @@ function callGemini(prompt) {
   });
 }
 
-function callGeminiWithSearch(prompt) {
-  var key = getApiKey();
-  if (!key) return Promise.reject(new Error('Sin API key'));
-  return fetch(GEMINI_URL + key, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      contents: [{parts: [{text: prompt}]}],
-      tools: [{google_search: {}}]
-    })
-  })
-  .then(function(r){return r.json();})
-  .then(function(data){
-    if (data.error) throw new Error(data.error.message);
-    return _geminiText(data);
-  });
-}
 
 function callGeminiVision(base64data, mimeType, prompt) {
   var key = getApiKey();
@@ -1798,13 +1804,16 @@ function importFromMaps() {
 
   // Detect list/tour URL (maps/@coords/data=... with encoded token)
   var isListOrTour = /maps\/@[\d.,]+\/data=/.test(url) || /maps\/placesshared/.test(url);
-  var geminiPrompt = isListOrTour
-    ? 'Visita este enlace de Google Maps y extrae TODOS los lugares de Nueva York que contiene la lista o tour:\n'+url+'\n\nDevuelve UNA linea por sitio en este formato exacto:\nNOMBRE|ZONA|CATEGORIA\nZONA debe ser: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA debe ser: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos, sin texto adicional ni encabezados.'
-    : 'Esta es una URL de Google Maps compartida:\n'+url+'\n\nExtrae todos los nombres de lugares de Nueva York que puedas identificar. Devuelve UNA linea por sitio:\nNOMBRE|ZONA|CATEGORIA\nZONA: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos.';
-  var callFn = isListOrTour ? callGeminiWithSearch : callGemini;
+  if (isListOrTour) {
+    document.getElementById('maps-open-link').href = url;
+    document.getElementById('maps-manual-box').style.display = 'block';
+    toast('Abre la lista en Maps, haz captura y subela');
+    return;
+  }
 
-  btn.disabled=true; btn.textContent=isListOrTour?'Buscando lista...':'Analizando...';
-  callFn(geminiPrompt)
+  // Fallback: send URL to Gemini to extract place names
+  btn.disabled=true; btn.textContent='Analizando...';
+  callGemini('Esta es una URL de Google Maps compartida:\n'+url+'\n\nExtrae todos los nombres de lugares de Nueva York que puedas identificar. Devuelve UNA linea por sitio:\nNOMBRE|ZONA|CATEGORIA\nZONA: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos.')
   .then(function(raw){
     var parsed=raw.split('\n').map(function(l){return l.trim();})
       .filter(function(l){return l.indexOf('|')>-1;})
@@ -1823,6 +1832,57 @@ function importFromMaps() {
   })
   .catch(function(err){toast('Error: '+err.message);})
   .finally(function(){btn.disabled=false;btn.textContent='Importar';});
+}
+
+function importFromMapsScreenshot(file) {
+  if (!file || !file.type.match(/^image\//)) { toast('Selecciona una imagen'); return; }
+  var existing = places.map(function(p){ return p.name.toLowerCase(); });
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var base64 = e.target.result.split(',')[1];
+    toast('Analizando captura con Gemini...');
+    callGeminiVision(base64, file.type,
+      'Esta es una captura de pantalla de una lista o tour de Google Maps. Extrae todos los nombres de lugares, atracciones y sitios de Nueva York que aparezcan. Devuelve UNA linea por sitio:\nNOMBRE|ZONA|CATEGORIA\nZONA: manhattan, brooklyn, queens, bronx o staten\nCATEGORIA: museo, parque, restaurante, compras, cultura, actividad, foto, transporte u otro\nSolo lineas de datos, sin numeracion ni explicaciones.')
+    .then(function(raw){
+      var parsed = raw.split('\n').map(function(l){return l.trim();})
+        .filter(function(l){return l.indexOf('|')>-1;})
+        .map(function(l){
+          var parts = l.split('|').map(function(p){return p.replace(/^\d+[\.\)]\s*/,'').trim();});
+          var name = parts[0]; if(!name||name.length<2) return null;
+          var zone = VZ.filter(function(z){return (parts[1]||'').toLowerCase().indexOf(z)>-1;})[0]||guessZone(name);
+          var cat  = VC.filter(function(c){return (parts[2]||'').toLowerCase().indexOf(c)>-1;})[0]||guessCat(name,name);
+          var isDup = existing.some(function(n){return sim(n,name)>0.75;});
+          return {id:Date.now()+Math.random(),name:name,zone:zone,cat:cat,notes:'',isDup:isDup};
+        }).filter(function(x){return x!==null;});
+      extracted = parsed;
+      renderExtracted();
+      toast(parsed.length>0 ? parsed.length+' sitios detectados en la captura' : 'No se detectaron sitios');
+      document.getElementById('maps-screenshot-input').value='';
+      document.getElementById('maps-manual-box').style.display='none';
+      document.getElementById('gmaps-url').value='';
+    })
+    .catch(function(err){ toast('Error al analizar captura: '+err.message); });
+  };
+  reader.readAsDataURL(file);
+}
+
+function processMapsNames() {
+  var raw = document.getElementById('maps-manual-names').value.trim();
+  if (!raw) { toast('Pega los nombres primero'); return; }
+  var existing = places.map(function(p){ return p.name.toLowerCase(); });
+  var names = raw.split('\n')
+    .map(function(l){ return l.trim().replace(/^[-•*\d.)\s]+/, ''); })
+    .filter(function(l){ return l.length > 2; });
+  if (names.length === 0) { toast('No se detectaron nombres'); return; }
+  extracted = names.map(function(name){
+    var isDup = existing.some(function(n){ return sim(n, name.toLowerCase()) > 0.75; });
+    return {id:Date.now()+Math.random(), name:name, zone:guessZone(name), cat:guessCat(name,name), notes:'', isDup:isDup};
+  });
+  renderExtracted();
+  toast(extracted.length + ' sitios procesados');
+  document.getElementById('maps-manual-names').value = '';
+  document.getElementById('maps-manual-box').style.display = 'none';
+  document.getElementById('gmaps-url').value = '';
 }
 
 function buildLocalItinerary(days, pace, prio, dateVal) {
