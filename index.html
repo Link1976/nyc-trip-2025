@@ -1995,7 +1995,11 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
           placed = true;
         } else { zIdx++; zItemIdx = 0; }
       }
-      if (!placed) break;
+      if (!placed) {
+        // sin sitios pero puede haber dias bloqueados pendientes — no cortar
+        if (Object.keys(lockedIndices).some(function(k){ return parseInt(k) > di; })) continue;
+        break;
+      }
       dayNum++;
     }
     return dayPlan;
@@ -2009,7 +2013,11 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
       continue;
     }
     var batch = sorted.slice(used, used + maxPerDay);
-    if (!batch.length) break;
+    if (!batch.length) {
+      // sin sitios — seguir solo si hay dias bloqueados por delante
+      if (Object.keys(lockedIndices).some(function(k){ return parseInt(k) > d; })) continue;
+      break;
+    }
     var zoneCounts = {};
     batch.forEach(function(p){ zoneCounts[p.zone] = (zoneCounts[p.zone]||0) + 1; });
     var mainZone = 'manhattan';
@@ -2022,23 +2030,34 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
 }
 
 function optimizeRoute(items) {
-  var withCoords = items.filter(function(p){ return p.lat && p.lng; });
-  var noCoords = items.filter(function(p){ return !p.lat || !p.lng; });
-  if (withCoords.length < 2) return items;
-  var result = [];
-  var remaining = withCoords.slice();
-  var current = HOTEL; // empezar siempre desde el hotel
-  while (remaining.length > 0) {
-    var nearestIdx = 0, nearestDist = Infinity;
-    remaining.forEach(function(p, i){
-      var d = Math.pow(p.lat-current.lat,2) + Math.pow(p.lng-current.lng,2);
-      if (d < nearestDist) { nearestDist=d; nearestIdx=i; }
-    });
-    var next = remaining.splice(nearestIdx,1)[0];
-    result.push(next);
-    current = next;
+  var MORNING_CATS = ['museo','parque','foto','cultura','actividad'];
+  var SHOP_CATS = ['compras','mercado'];
+  var morning = items.filter(function(p){ return MORNING_CATS.indexOf(p.cat) > -1; });
+  var shops   = items.filter(function(p){ return SHOP_CATS.indexOf(p.cat) > -1; });
+  var other   = items.filter(function(p){ return MORNING_CATS.indexOf(p.cat) === -1 && SHOP_CATS.indexOf(p.cat) === -1; });
+
+  function nearestNeighbor(list, start) {
+    var withCoords = list.filter(function(p){ return p.lat && p.lng; });
+    var noCoords   = list.filter(function(p){ return !p.lat || !p.lng; });
+    if (withCoords.length < 2) return list;
+    var result = [], remaining = withCoords.slice(), current = start;
+    while (remaining.length > 0) {
+      var nearestIdx = 0, nearestDist = Infinity;
+      remaining.forEach(function(p, i){
+        var d = Math.pow(p.lat-current.lat,2) + Math.pow(p.lng-current.lng,2);
+        if (d < nearestDist) { nearestDist=d; nearestIdx=i; }
+      });
+      var next = remaining.splice(nearestIdx,1)[0];
+      result.push(next); current = next;
+    }
+    return result.concat(noCoords);
   }
-  return result.concat(noCoords);
+
+  // Optimizar mañana desde hotel; tiendas desde donde acaba la mañana
+  var morningOpt = nearestNeighbor(morning.concat(other), HOTEL);
+  var lastMorning = morningOpt.length ? morningOpt[morningOpt.length-1] : HOTEL;
+  var shopsOpt = nearestNeighbor(shops, lastMorning.lat ? lastMorning : HOTEL);
+  return morningOpt.concat(shopsOpt);
 }
 
 function toggleVisitFromItin(id, btn) {
