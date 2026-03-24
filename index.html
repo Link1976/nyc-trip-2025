@@ -2190,16 +2190,34 @@ function generateItinerary() {
     }
   }
 
+  // Separar turismo de tiendas para el prompt
+  var nonVisited2 = places.slice().filter(function(p){ return visited.indexOf(p.id) === -1; });
+  var SIGHT_CATS2 = ['museo','foto','cultura','parque','actividad'];
+  var SHOP_CATS2  = ['compras','mercado'];
+  var ptSight = nonVisited2.filter(function(p){ return SIGHT_CATS2.indexOf(p.cat) > -1; })
+    .sort(function(a,b){return b.votes-a.votes;})
+    .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.cat+(p.votes?', '+p.votes+' votos':'')+')';}).join('\n');
+  var ptShop = nonVisited2.filter(function(p){ return SHOP_CATS2.indexOf(p.cat) > -1; })
+    .sort(function(a,b){return b.votes-a.votes;})
+    .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.cat+')';}).join('\n');
+
   var prompt = 'Eres experto en viajes familiares a Nueva York. Grupo: 8 adultos y 8 ninos de 5 a 15 anos.\n'+
-    'Viaje: '+days+' dias, ritmo '+pace+', prioridad: '+pr+'.\n'+
-    'IMPORTANTE sobre dias especiales:\n'+
-    '- Dia 1 (28 marzo, sabado): llegada muy tarde por la noche. Solo traslado al hotel, no hay tiempo para actividades.\n'+
-    '- Dia 8 (4 abril, sabado): salida antes de las 11h. Solo actividades muy breves de primera manana o directamente checkout.\n'+
-    '- Los dias completos son del 29 de marzo (domingo) al 3 de abril (viernes), 6 dias completos.\n'+
-    lockedInfo+'\n'+
-    'Sitios (turismo, museos, compras, actividades):\n'+ptMain+'\n\n'+
-    (ptRest?'Restaurantes disponibles (sugerirlos como opcionales segun la zona del dia, no como parte fija del itinerario):\n'+ptRest+'\n\n':'')+
-    'Genera itinerario dia a dia'+(dateVal?' desde el '+dateVal:'')+'. IMPORTANTE: intenta incluir TODOS los sitios de la lista distribuidos a lo largo de los dias. Para dias bloqueados muestra el plan fijo. Para el resto: zona principal, sitios en orden logico manana-tarde-noche, al final del dia sugiere 1-2 restaurantes de la zona como opciones para comer o cenar, 1 consejo para grupo con ninos. Encabezados DIA 1, DIA 2, etc. En espanol, conciso.';
+    'Viaje: '+days+' dias, ritmo '+pace+'.\n'+
+    '\nCONTEXTO DEL VIAJE:\n'+
+    '- Dia 1 (28 marzo sabado): llegada noche, solo hotel, SIN actividades.\n'+
+    '- Dias completos: 29 marzo (domingo) al 3 abril (viernes) — 6 dias para turismo.\n'+
+    '- Dia 8 (4 abril sabado): salida antes 11h, solo desayuno/checkout.\n'+
+    lockedInfo+
+    '\nREGLAS ESTRICTAS PARA EL ITINERARIO:\n'+
+    '1. NUNCA pongas un dia entero de tiendas. Las tiendas van siempre en la tarde, despues del turismo.\n'+
+    '2. Cada dia libre: manana con 2-4 sitios de turismo/museos/parques agrupados por zona geografica.\n'+
+    '3. Tarde: continuar turismo y anadir opcionalmente 1-2 tiendas/mercados si estan en la misma zona.\n'+
+    '4. Orden logico geografico: minimiza desplazamientos, agrupa sitios cercanos entre si.\n'+
+    '5. Distribuye las tiendas a lo largo de todos los dias, no las concentres en uno solo.\n'+
+    '\nSITIOS DE TURISMO (museos, parques, monumentos, actividades):\n'+ptSight+'\n'+
+    '\nTIENDAS Y MERCADOS (solo en tarde, distribuidas entre los dias):\n'+(ptShop||'(ninguna)')+'\n'+
+    (ptRest?'\nRESTAURANTES (sugerir 1-2 al final de cada dia segun zona, no como plan fijo):\n'+ptRest+'\n':'')+
+    '\nGenera el itinerario dia a dia desde el 28 de marzo. Encabezado: DIA 1 - Sabado 28/3, DIA 2 - Domingo 29/3, etc. Para dias bloqueados pon el plan fijo. En espanol, conciso.';
 
   callGemini(prompt)
   .then(function(text){
