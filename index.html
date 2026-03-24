@@ -439,7 +439,7 @@
       <div class="itin-controls">
         <div class="itin-group">
           <label>Dias</label>
-          <input type="number" id="cfg-days" value="5" min="1" max="14" style="width:65px" />
+          <input type="number" id="cfg-days" value="8" min="1" max="14" style="width:65px" />
         </div>
         <div class="itin-group">
           <label>Ritmo</label>
@@ -459,7 +459,7 @@
         </div>
         <div class="itin-group">
           <label>Fecha inicio</label>
-          <input type="date" id="cfg-date" />
+          <input type="date" id="cfg-date" value="2026-03-28" />
         </div>
       </div>
       <button class="btn btn-red" id="gen-btn" onclick="generateItinerary()">Generar con IA</button>
@@ -1887,7 +1887,13 @@ function processMapsNames() {
 
 function buildLocalItinerary(days, pace, prio, dateVal) {
   var maxPerDay = pace === 'relajado' ? 3 : pace === 'normal' ? 5 : 7;
-  var sorted = places.filter(function(p){ return visited.indexOf(p.id) === -1; });
+  var allNonVisited = places.filter(function(p){ return visited.indexOf(p.id) === -1; });
+  var restByZone = {};
+  allNonVisited.filter(function(p){ return p.cat === 'restaurante'; }).forEach(function(p){
+    if (!restByZone[p.zone]) restByZone[p.zone] = [];
+    restByZone[p.zone].push(p);
+  });
+  var sorted = allNonVisited.filter(function(p){ return p.cat !== 'restaurante'; });
   // Identify locked day indices (0-based)
   var lockedIndices = {};
   if (dateVal) {
@@ -1927,7 +1933,7 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
         items.sort(function(a,b){ return b.votes - a.votes; });
         var batch = items.slice(zItemIdx, zItemIdx + maxPerDay);
         if (batch.length) {
-          dayPlan.push({ zone: z, items: batch });
+          dayPlan.push({ zone: z, items: batch, rests: (restByZone[z]||[]).slice(0,2) });
           zItemIdx += maxPerDay;
           if (zItemIdx >= items.length) { zIdx++; zItemIdx = 0; }
           placed = true;
@@ -1953,7 +1959,7 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
     var mainZone = 'manhattan';
     var maxC = 0;
     for (var z in zoneCounts) { if (zoneCounts[z] > maxC) { maxC = zoneCounts[z]; mainZone = z; } }
-    dayPlan.push({ zone: mainZone, items: batch });
+    dayPlan.push({ zone: mainZone, items: batch, rests: (restByZone[mainZone]||[]).slice(0,2) });
     used += maxPerDay;
   }
   return dayPlan;
@@ -2007,6 +2013,15 @@ function renderLocalItin(dayPlan, dateVal, pace) {
       tip = 'Llevar snacks y agua. Planificar paradas para descansar';
     }
     html += '<li style="color:#666;font-style:italic;border:none">Consejo: '+tip+'</li>';
+
+    if (day.rests && day.rests.length) {
+      html += '<li style="border:none;padding-top:6px"><span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#888">Donde comer en la zona</span><ul style="margin:4px 0 0 0;padding-left:16px">';
+      day.rests.forEach(function(r){
+        html += '<li style="font-size:0.82rem;color:#aaa;border:none;padding:2px 0">'+esc(r.name)+(r.notes?' — '+esc(r.notes):'')+'</li>';
+      });
+      html += '</ul></li>';
+    }
+
     html += '</ul>';
 
     if (routeUrl) {
@@ -2028,9 +2043,14 @@ function generateItinerary() {
   btn.disabled=true; btn.textContent='Generando...';
   var out = document.getElementById('itin-output');
   out.innerHTML='<div class="empty">Pensando el itinerario para el grupo...</div>';
-  var pt = places.slice().filter(function(p){ return visited.indexOf(p.id) === -1; })
+  var nonVisited = places.slice().filter(function(p){ return visited.indexOf(p.id) === -1; });
+  var ptMain = nonVisited.filter(function(p){ return p.cat !== 'restaurante'; })
     .sort(function(a,b){return b.votes-a.votes;})
     .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.cat+', '+p.votes+' votos'+(p.notes?', '+p.notes:'')+')';}).join('\n');
+  var ptRest = nonVisited.filter(function(p){ return p.cat === 'restaurante'; })
+    .sort(function(a,b){return b.votes-a.votes;})
+    .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.votes+' votos'+(p.notes?', '+p.notes:'')+')';}).join('\n');
+  var pt = ptMain;
   var pr = prio==='votos'?'priorizar los mas votados':prio==='ninos'?'priorizar aptos para ninos':'agrupar por zona geografica';
 
   // Build locked days context
@@ -2050,9 +2070,14 @@ function generateItinerary() {
 
   var prompt = 'Eres experto en viajes familiares a Nueva York. Grupo: 8 adultos y 8 ninos de 5 a 15 anos.\n'+
     'Viaje: '+days+' dias, ritmo '+pace+', prioridad: '+pr+'.\n'+
+    'IMPORTANTE sobre dias especiales:\n'+
+    '- Dia 1 (28 marzo, sabado): llegada muy tarde por la noche. Solo traslado al hotel, no hay tiempo para actividades.\n'+
+    '- Dia 8 (4 abril, sabado): salida antes de las 11h. Solo actividades muy breves de primera manana o directamente checkout.\n'+
+    '- Los dias completos son del 29 de marzo (domingo) al 3 de abril (viernes), 6 dias completos.\n'+
     lockedInfo+'\n'+
-    'Sitios propuestos:\n'+pt+'\n\n'+
-    'Genera itinerario dia a dia'+(dateVal?' desde el '+dateVal:'')+'. Para dias bloqueados muestra el plan fijo. Para el resto: zona principal, sitios en orden logico manana-tarde-noche, 1-2 consejos para grupo con ninos. Encabezados DIA 1, DIA 2, etc. En espanol, conciso.';
+    'Sitios (turismo, museos, compras, actividades):\n'+ptMain+'\n\n'+
+    (ptRest?'Restaurantes disponibles (sugerirlos como opcionales segun la zona del dia, no como parte fija del itinerario):\n'+ptRest+'\n\n':'')+
+    'Genera itinerario dia a dia'+(dateVal?' desde el '+dateVal:'')+'. Para dias bloqueados muestra el plan fijo. Para el resto: zona principal, sitios en orden logico manana-tarde-noche, al final del dia sugiere 1-2 restaurantes de la zona como opciones para comer o cenar, 1 consejo para grupo con ninos. Encabezados DIA 1, DIA 2, etc. En espanol, conciso.';
 
   callGemini(prompt)
   .then(function(text){
