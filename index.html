@@ -580,19 +580,41 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ── API Key helpers (Google Gemini — tier gratuito) ───────────────────────────
+// ── API Key helpers ───────────────────────────────────────────────────────────
 var API_KEY_SK = 'nyc_gemini_api_key';
 var GEMINI_MODELS = [
   'gemini-2.0-flash',
   'gemini-2.0-flash-lite'
 ];
 var GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
-var _geminiKeyFromFirebase = ''; // loaded at startup from Firebase /config/geminiKey
-var _geminiKeyLoad = null; // Promise que resuelve cuando la key está lista
+var _geminiKeyFromFirebase = '';
+var _groqKeyFromFirebase = '';
+var _geminiKeyLoad = null;
+var _groqKeyLoad = null;
 
 function getApiKey() {
-  // Firebase key takes priority (shared for all users), localStorage as fallback
   return _geminiKeyFromFirebase || localStorage.getItem(API_KEY_SK) || '';
+}
+function getGroqKey() {
+  return _groqKeyFromFirebase || '';
+}
+
+function callGroq(prompt) {
+  var keyLoad = _groqKeyLoad || Promise.resolve();
+  return keyLoad.then(function() {
+    var key = getGroqKey();
+    if (!key) throw new Error('Sin Groq key');
+    return fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
+      body: JSON.stringify({model: 'llama-3.3-70b-versatile', messages: [{role: 'user', content: prompt}]})
+    });
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if (data.error) throw new Error(data.error.message);
+    return ((data.choices||[])[0]||{}).message.content || '';
+  });
 }
 
 
@@ -1087,12 +1109,13 @@ try {
   fbApp = firebase.initializeApp(firebaseConfig);
   fbDb = firebase.database();
   fbReady = true;
-  // Load shared Gemini key from Firebase (set once by admin in Firebase Console)
   _geminiKeyLoad = fbDb.ref('config/geminiKey').once('value').then(function(snap) {
     var k = snap.val();
-    if (k && typeof k === 'string' && k.length > 10) {
-      _geminiKeyFromFirebase = k;
-    }
+    if (k && typeof k === 'string' && k.length > 10) _geminiKeyFromFirebase = k;
+  });
+  _groqKeyLoad = fbDb.ref('config/groqKey').once('value').then(function(snap) {
+    var k = snap.val();
+    if (k && typeof k === 'string' && k.length > 10) _groqKeyFromFirebase = k;
   });
 } catch(e) {
   fbReady = false;
@@ -2331,13 +2354,14 @@ function generateItinerary() {
     (ptRest?'\nRESTAURANTES (sugerir 1-2 al final de cada dia segun zona, no como plan fijo):\n'+ptRest+'\n':'')+
     '\nGenera el itinerario dia a dia desde el 28 de marzo. Encabezado: DIA 1 - Sabado 28/3, DIA 2 - Domingo 29/3, etc. Para dias bloqueados pon el plan fijo. En espanol, conciso.';
 
-  callGemini(prompt)
+  callGroq(prompt)
+  .catch(function(){ return callGemini(prompt); })
   .then(function(text){
     renderItin(text);
     toast('Itinerario generado con IA');
   })
   .catch(function(err){
-    console.error('Gemini error:', err);
+    console.error('IA error:', err);
     var dayPlan = buildLocalItinerary(days, pace, prio, dateVal);
     if (dayPlan.length > 0) {
       renderLocalItin(dayPlan, dateVal, pace);
