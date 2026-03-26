@@ -2353,7 +2353,17 @@ function generateItinerary() {
     '\nSITIOS DE TURISMO (museos, parques, monumentos, actividades):\n'+ptSight+'\n'+
     '\nTIENDAS Y MERCADOS (solo en tarde, distribuidas entre los dias):\n'+(ptShop||'(ninguna)')+'\n'+
     (ptRest?'\nRESTAURANTES (sugerir 1-2 al final de cada dia segun zona, no como plan fijo):\n'+ptRest+'\n':'')+
-    '\nGenera el itinerario dia a dia desde el 28 de marzo. Encabezado: DIA 1 - Sabado 28/3, DIA 2 - Domingo 29/3, etc. Para dias bloqueados pon el plan fijo. En espanol, conciso.';
+    '\nFORMATO OBLIGATORIO para cada dia (sin markdown, sin asteriscos, sin #):\n'+
+    'DIA X - DiaNombre DD/M\n'+
+    '☀️ Mañana\n'+
+    '- Sitio 1\n'+
+    '- Sitio 2\n'+
+    'Comida: Nombre restaurante (zona)\n'+
+    '🌆 Tarde\n'+
+    '- Sitio 3\n'+
+    '- Tienda 1\n'+
+    'Cena: Nombre restaurante (zona)\n'+
+    '\nUsa exactamente ese formato. Sin texto extra entre dias. En espanol.';
 
   callGroq(prompt)
   .catch(function(){ return callGemini(prompt); })
@@ -2394,6 +2404,13 @@ function renderItin(text) {
     if (item.isPeriod) {
       return '<li class="itin-period" style="border:none">' + esc(item.text) + '</li>';
     }
+    if (item.isMeal) {
+      var mealPlace = findPlaceInLine(item.text);
+      var mealMu = mealPlace ? mapsUrl(mealPlace.name, mealPlace.addr) : null;
+      var mealName = item.text.replace(/^(🍽\s*|comida:|cena:|almuerzo:)\s*/i, '');
+      return '<li style="border:none;padding:4px 0"><span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#ccc">🍽 ' + esc(mealName) + '</span>' +
+        (mealMu ? ' <a class="maps-link" href="' + mealMu + '" target="_blank" rel="noopener">Maps</a>' : '') + '</li>';
+    }
     if (p) {
       var mu = mapsUrl(p.name, p.addr);
       var isVis = visited.indexOf(p.id) > -1;
@@ -2433,13 +2450,19 @@ function renderItin(text) {
   }
 
   lines.forEach(function(line) {
-    var t = line.trim();
+    var t = line.trim().replace(/\*+/g, '').replace(/^#+\s*/, '').trim(); // strip markdown
     if (/^D[IÍ]A\s*\d+/i.test(t)) { flush(); dt = t; }
     else if (dt) {
-      var clean = t.replace(/^[-*•#]+\s*/, '');
+      var clean = t.replace(/^[-*•#]+\s*/, '').replace(/\*+/g, '').trim();
+      if (!clean) return;
       // Detectar líneas de periodo (mañana/tarde)
       if (/^(☀️|🌆|manana|mañana|tarde|morning|afternoon)/i.test(clean)) {
         dl.push({ text: clean, isPeriod: true });
+        return;
+      }
+      // Detectar sugerencias de restaurante (comida/cena)
+      if (/^(🍽|comida:|cena:|almuerzo:|restaurante comida|restaurante cena)/i.test(clean)) {
+        dl.push({ text: clean, isMeal: true });
         return;
       }
       var p = findPlaceInLine(clean);
