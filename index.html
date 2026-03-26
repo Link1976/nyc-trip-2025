@@ -582,7 +582,11 @@
 <script>
 // ── API Key helpers (Google Gemini — tier gratuito) ───────────────────────────
 var API_KEY_SK = 'nyc_gemini_api_key';
-var GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=';
+var GEMINI_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-1.5-flash'
+];
+var GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
 var _geminiKeyFromFirebase = ''; // loaded at startup from Firebase /config/geminiKey
 var _geminiKeyLoad = null; // Promise que resuelve cuando la key está lista
 
@@ -598,16 +602,12 @@ function _geminiText(data) {
     .map(function(p){return p.text||'';}).join('');
 }
 
-function callGemini(prompt) {
-  var keyLoad = _geminiKeyLoad || Promise.resolve();
-  return keyLoad.then(function() {
-    var key = getApiKey();
-    if (!key) throw new Error('Sin API key');
-    return fetch(GEMINI_URL + key, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({contents:[{parts:[{text: prompt}]}]})
-    });
+function _callGeminiModel(model, key, body) {
+  var url = GEMINI_BASE + model + ':generateContent?key=' + key;
+  return fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
   })
   .then(function(r){return r.json();})
   .then(function(data){
@@ -616,22 +616,42 @@ function callGemini(prompt) {
   });
 }
 
+function callGemini(prompt) {
+  var keyLoad = _geminiKeyLoad || Promise.resolve();
+  return keyLoad.then(function() {
+    var key = getApiKey();
+    if (!key) throw new Error('Sin API key');
+    var body = {contents:[{parts:[{text: prompt}]}]};
+    // Intenta modelos en orden hasta que uno funcione
+    return GEMINI_MODELS.reduce(function(chain, model) {
+      return chain.catch(function(err) {
+        if (err.message && (err.message.indexOf('quota') !== -1 || err.message.indexOf('RESOURCE_EXHAUSTED') !== -1 || err.message.indexOf('429') !== -1)) {
+          return _callGeminiModel(model, key, body);
+        }
+        throw err;
+      });
+    }, _callGeminiModel(GEMINI_MODELS[0], key, body));
+  });
+}
+
 
 function callGeminiVision(base64data, mimeType, prompt) {
-  var key = getApiKey();
-  if (!key) return Promise.reject(new Error('Sin API key'));
-  return fetch(GEMINI_URL + key, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({contents:[{parts:[
+  var keyLoad = _geminiKeyLoad || Promise.resolve();
+  return keyLoad.then(function() {
+    var key = getApiKey();
+    if (!key) throw new Error('Sin API key');
+    var body = {contents:[{parts:[
       {inline_data:{mime_type: mimeType, data: base64data}},
       {text: prompt}
-    ]}]})
-  })
-  .then(function(r){return r.json();})
-  .then(function(data){
-    if (data.error) throw new Error(data.error.message);
-    return _geminiText(data);
+    ]}]};
+    return GEMINI_MODELS.reduce(function(chain, model) {
+      return chain.catch(function(err) {
+        if (err.message && (err.message.indexOf('quota') !== -1 || err.message.indexOf('RESOURCE_EXHAUSTED') !== -1 || err.message.indexOf('429') !== -1)) {
+          return _callGeminiModel(model, key, body);
+        }
+        throw err;
+      });
+    }, _callGeminiModel(GEMINI_MODELS[0], key, body));
   });
 }
 
