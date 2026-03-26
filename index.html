@@ -243,6 +243,12 @@
   .day-block.is-locked h3 { color: var(--accent); }
   .itin-item.itin-visited { opacity:0.45; }
   .itin-item.itin-visited .itin-name { text-decoration: line-through; }
+  .dur-badge { font-size:0.68rem; color:#666; margin-left:4px; }
+  .rain-badge { font-size:0.68rem; margin-left:3px; }
+  .rain-mode .outdoor-site { opacity:0.3; }
+  .rain-mode .outdoor-site .itin-name { text-decoration: line-through; }
+  .btn-rain { background:none; border:1px solid #444; color:#888; font-size:0.8rem; padding:6px 14px; border-radius:6px; cursor:pointer; margin-left:8px; font-family:'DM Sans',sans-serif; }
+  .btn-rain.active { border-color:#60a5fa; color:#60a5fa; }
   .btn-visto { background:none; border:1px solid #444; color:#888; font-size:0.68rem; padding:2px 7px; border-radius:4px; cursor:pointer; margin-left:6px; vertical-align:middle; font-family:'DM Sans',sans-serif; }
   .btn-visto.is-visited { border-color:#3DDC84; color:#3DDC84; }
   .itin-period { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#666; margin:8px 0 4px; }
@@ -500,6 +506,7 @@
         </div>
       </div>
       <button class="btn btn-red" id="gen-btn" onclick="generateItinerary()">Generar con IA</button>
+      <button class="btn-rain" id="rain-btn" onclick="toggleRainMode()">☁️ Lluvia</button>
     </div>
     <div id="itin-output"></div>
   </div>
@@ -684,6 +691,9 @@ var ZC = { manhattan:'#4A90E2', brooklyn:'#9B59B6', queens:'#27AE60', bronx:'#E6
 var VZ = ['manhattan','brooklyn','queens','bronx','staten'];
 var VC = ['museo','parque','restaurante','compras','cultura','actividad','foto','mercado','transporte','otro'];
 var CAT_EMOJI = {museo:'🏛',parque:'🌳',restaurante:'🍽',compras:'🛍',cultura:'🎭',actividad:'🎡',foto:'📸',mercado:'🏪',transporte:'🚇',otro:'📍'};
+var CAT_DURATION = {museo:60,actividad:90,parque:60,foto:20,cultura:45,compras:45,mercado:45,restaurante:0,transporte:0,otro:30};
+var CAT_INDOOR = {museo:true,actividad:true,compras:true,mercado:true,cultura:true};
+var MAX_MIN = {relajado:360,normal:450,intenso:540};
 var HOTEL = {lat:40.7476, lng:-73.9961}; // INNSiDE by Meliá, Midtown
 var SEED = [
   {id:1,name:'Central Park',zone:'manhattan',cat:'parque',notes:'Perfecto para ninos, bici o a pie',who:'Maria',votes:3},
@@ -2249,9 +2259,16 @@ function renderLocalItin(dayPlan, dateVal, pace) {
       var mu = mapsUrl(p.name, p.addr);
       var isVis = visited.indexOf(p.id) > -1;
       var emoji = CAT_EMOJI[p.cat] || '📍';
-      return '<li class="itin-item'+(isVis?' itin-visited':'')+'" data-id="'+p.id+'">'+
+      var dur = CAT_DURATION[p.cat];
+      var durTxt = dur ? (dur >= 60 ? '~'+Math.round(dur/60)+'h' : '~'+dur+'min') : '';
+      var isIndoor = CAT_INDOOR[p.cat];
+      var rainClass = isIndoor ? '' : ' outdoor-site';
+      var rainBadge = isIndoor ? '<span class="rain-badge" title="Interior">🏛</span>' : '<span class="rain-badge" title="Exterior">🌳</span>';
+      return '<li class="itin-item'+rainClass+(isVis?' itin-visited':'')+'" data-id="'+p.id+'">'+
         emoji+' <span class="itin-name">'+esc(p.name)+'</span>'+
         ' <span style="color:#555;font-size:0.72rem">'+p.cat+'</span>'+
+        (durTxt?'<span class="dur-badge">'+durTxt+'</span>':'')+
+        rainBadge+
         '<button class="btn-visto'+(isVis?' is-visited':'')+'" onclick="toggleVisitFromItin('+JSON.stringify(p.id)+',this)">'+(isVis?'✓ Visto':'Marcar visto')+'</button>'+
         (p.addr?'<div class="place-addr">'+esc(p.addr)+'</div>':'')+
         (p.notes?'<div style="color:#666;font-size:0.78rem">'+esc(p.notes)+'</div>':'')+
@@ -2353,7 +2370,7 @@ function generateItinerary() {
     .sort(function(a,b){return b.votes-a.votes;})
     .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+')';}).join('\n');
 
-  var maxPerDay = pace === 'relajado' ? 4 : pace === 'intenso' ? 7 : 5;
+  var maxMinPerDay = MAX_MIN[pace] || 450;
   var activeDays = 6; // dias completos de turismo
 
   var prompt = 'Eres experto en viajes familiares a Nueva York. Grupo: 8 adultos y 8 ninos de 5 a 15 anos.\n'+
@@ -2363,9 +2380,10 @@ function generateItinerary() {
     '- Dias completos: 29 marzo al 3 abril — '+activeDays+' dias para turismo\n'+
     '- Dia 8 (4 abril): salida antes 11h — sites:[], lunch:null, dinner:null\n'+
     lockedInfo+
+    '\nDURACIONES por categoria: museo=1h, actividad=1.5h, parque=1h, foto=20min, cultura=45min, compras=45min, mercado=45min\n'+
     '\nREGLAS:\n'+
-    '1. Maximo '+maxPerDay+' sitios por dia (ritmo '+pace+'). Distribuye uniformemente.\n'+
-    '2. Incluye todos los sitios posibles respetando el maximo por dia.\n'+
+    '1. Maximo '+(maxMinPerDay/60)+'h por dia (ritmo '+pace+'). Distribuye uniformemente.\n'+
+    '2. Incluye todos los sitios posibles respetando el maximo de horas.\n'+
     '3. Tiendas solo en tarde. Turismo en manana y tarde.\n'+
     '4. Agrupa por zona geografica para minimizar desplazamientos.\n'+
     '5. lunch y dinner: elige de la lista de restaurantes segun la zona del dia.\n'+
@@ -2382,12 +2400,17 @@ function generateItinerary() {
     var jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('sin JSON');
     var aiDays = JSON.parse(jsonMatch[0]);
-    // Reequilibrar: mover exceso de un dia al siguiente con menos sitios
-    var maxS = maxPerDay;
+    // Reequilibrar por horas: si un dia supera maxMinPerDay, mover al siguiente
+    function dayMinutes(sites) {
+      return (sites||[]).reduce(function(sum, name) {
+        var p = findPlaceByName(name);
+        return sum + (p ? (CAT_DURATION[p.cat] || 30) : 30);
+      }, 0);
+    }
     for (var i = 0; i < aiDays.length - 1; i++) {
       var d = aiDays[i];
-      if (!d.sites) continue;
-      while (d.sites.length > maxS) {
+      if (!d.sites || !d.sites.length) continue;
+      while (d.sites.length > 1 && dayMinutes(d.sites) > maxMinPerDay) {
         var next = aiDays[i + 1];
         if (!next.sites) next.sites = [];
         next.sites.unshift(d.sites.pop());
@@ -2535,6 +2558,15 @@ function renderItin(text) {
   });
   flush();
   document.getElementById('itin-output').innerHTML = html || '<div class="empty">' + esc(text) + '</div>';
+}
+
+function toggleRainMode() {
+  var out = document.getElementById('itin-output');
+  var btn = document.getElementById('rain-btn');
+  if (!out) return;
+  var active = out.classList.toggle('rain-mode');
+  btn.classList.toggle('active', active);
+  toast(active ? '☁️ Modo lluvia: solo interiores destacados' : 'Modo lluvia desactivado');
 }
 
 function toast(msg) {
