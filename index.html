@@ -2373,20 +2373,61 @@ function generateItinerary() {
   .finally(function(){btn.disabled=false; btn.textContent='Generar con IA';});
 }
 
+function findPlaceInLine(line) {
+  var low = line.toLowerCase();
+  var best = null, bestLen = 0;
+  places.forEach(function(p) {
+    if (!p.name) return;
+    var pn = p.name.toLowerCase();
+    if (low.indexOf(pn) > -1 && pn.length > bestLen) { best = p; bestLen = pn.length; }
+  });
+  return best;
+}
+
 function renderItin(text) {
-  var lines=text.split('\n').filter(function(l){return l.trim();});
-  var html='',dt='',dl=[];
-  function flush(){
-    if(dt){html+='<div class="day-block"><h3>'+esc(dt)+'</h3><ul>'+dl.map(function(l){return '<li>'+esc(l)+'</li>';}).join('')+'</ul></div>';dt='';dl=[];}
+  var lines = text.split('\n').filter(function(l){ return l.trim(); });
+  var html = '', dt = '', dl = [], dayPlaces = [];
+
+  function flush() {
+    if (!dt) return;
+    var routeUrl = mapsRouteUrl(dayPlaces);
+    html += '<div class="day-block"><h3>' + esc(dt) + '</h3><ul>';
+    dl.forEach(function(item) {
+      var p = item.place;
+      if (p) {
+        var mu = mapsUrl(p.name, p.addr);
+        var isVis = visited.indexOf(p.id) > -1;
+        var emoji = CAT_EMOJI[p.cat] || '📍';
+        html += '<li class="itin-item' + (isVis ? ' itin-visited' : '') + '">' +
+          emoji + ' <span class="itin-name">' + esc(p.name) + '</span>' +
+          '<button class="btn-visto' + (isVis ? ' is-visited' : '') + '" onclick="toggleVisitFromItin(' + JSON.stringify(p.id) + ',this)">' + (isVis ? '✓ Visto' : 'Marcar visto') + '</button>' +
+          '<a class="maps-link" href="' + mu + '" target="_blank" rel="noopener">Maps</a>' +
+          (item.text !== p.name ? '<div style="color:#555;font-size:0.78rem">' + esc(item.text) + '</div>' : '') +
+          '</li>';
+      } else {
+        html += '<li>' + esc(item.text) + '</li>';
+      }
+    });
+    html += '</ul>';
+    if (routeUrl) html += '<a class="maps-route" href="' + routeUrl + '" target="_blank" rel="noopener">Abrir ruta del dia en Google Maps</a>';
+    html += '</div>';
+    dt = ''; dl = []; dayPlaces = [];
   }
-  lines.forEach(function(line){
-    var t=line.trim();
-    if(/^D[IA][A]?\s*\d+/i.test(t)){flush();dt=t;}
-    else if(dt){dl.push(t.replace(/^[-*]\s*/,''));}
-    else{html+='<p style="color:#777;font-size:0.85rem;margin-bottom:8px">'+esc(t)+'</p>';}
+
+  lines.forEach(function(line) {
+    var t = line.trim();
+    if (/^D[IÍ]A\s*\d+/i.test(t)) { flush(); dt = t; }
+    else if (dt) {
+      var clean = t.replace(/^[-*•]\s*/, '');
+      var p = findPlaceInLine(clean);
+      dl.push({ text: clean, place: p });
+      if (p && dayPlaces.indexOf(p) === -1) dayPlaces.push(p);
+    } else {
+      html += '<p style="color:#777;font-size:0.85rem;margin-bottom:8px">' + esc(t) + '</p>';
+    }
   });
   flush();
-  document.getElementById('itin-output').innerHTML=html||'<div class="empty">'+esc(text)+'</div>';
+  document.getElementById('itin-output').innerHTML = html || '<div class="empty">' + esc(text) + '</div>';
 }
 
 function toast(msg) {
