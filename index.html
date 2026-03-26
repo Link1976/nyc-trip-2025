@@ -2353,18 +2353,22 @@ function generateItinerary() {
     .sort(function(a,b){return b.votes-a.votes;})
     .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+')';}).join('\n');
 
+  var maxPerDay = pace === 'relajado' ? 4 : pace === 'intenso' ? 7 : 5;
+  var activeDays = 6; // dias completos de turismo
+
   var prompt = 'Eres experto en viajes familiares a Nueva York. Grupo: 8 adultos y 8 ninos de 5 a 15 anos.\n'+
     'Viaje: '+days+' dias, ritmo '+pace+'.\n'+
     '\nCONTEXTO:\n'+
     '- Dia 1 (28 marzo): llegada noche — sites:[], lunch:null, dinner:null\n'+
-    '- Dias completos: 29 marzo al 3 abril — 6 dias para turismo\n'+
+    '- Dias completos: 29 marzo al 3 abril — '+activeDays+' dias para turismo\n'+
     '- Dia 8 (4 abril): salida antes 11h — sites:[], lunch:null, dinner:null\n'+
     lockedInfo+
     '\nREGLAS:\n'+
-    '1. Incluye TODOS los sitios de turismo y tiendas. No omitas ninguno.\n'+
-    '2. Tiendas solo en tarde. Turismo en manana y tarde.\n'+
-    '3. Agrupa por zona geografica.\n'+
-    '4. lunch y dinner: elige de la lista de restaurantes segun la zona del dia.\n'+
+    '1. Maximo '+maxPerDay+' sitios por dia (ritmo '+pace+'). Distribuye uniformemente.\n'+
+    '2. Incluye todos los sitios posibles respetando el maximo por dia.\n'+
+    '3. Tiendas solo en tarde. Turismo en manana y tarde.\n'+
+    '4. Agrupa por zona geografica para minimizar desplazamientos.\n'+
+    '5. lunch y dinner: elige de la lista de restaurantes segun la zona del dia.\n'+
     '\nSITIOS TURISMO:\n'+ptSight+'\n'+
     '\nTIENDAS:\n'+(ptShop||'(ninguna)')+'\n'+
     (ptRest?'\nRESTAURANTES (solo para lunch/dinner):\n'+ptRest+'\n':'')+
@@ -2378,6 +2382,17 @@ function generateItinerary() {
     var jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('sin JSON');
     var aiDays = JSON.parse(jsonMatch[0]);
+    // Reequilibrar: mover exceso de un dia al siguiente con menos sitios
+    var maxS = maxPerDay;
+    for (var i = 0; i < aiDays.length - 1; i++) {
+      var d = aiDays[i];
+      if (!d.sites) continue;
+      while (d.sites.length > maxS) {
+        var next = aiDays[i + 1];
+        if (!next.sites) next.sites = [];
+        next.sites.unshift(d.sites.pop());
+      }
+    }
     var dayPlan = buildDayPlanFromAI(aiDays);
     renderLocalItin(dayPlan, dateVal, pace);
     toast('Itinerario generado con IA');
