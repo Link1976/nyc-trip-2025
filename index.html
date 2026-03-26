@@ -2283,7 +2283,8 @@ function generateItinerary() {
     .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.cat+', '+p.votes+' votos'+(p.notes?', '+p.notes:'')+')';}).join('\n');
   var ptRest = nonVisited.filter(function(p){ return p.cat === 'restaurante'; })
     .sort(function(a,b){return b.votes-a.votes;})
-    .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.votes+' votos'+(p.notes?', '+p.notes:'')+')';}).join('\n');
+    .slice(0, 12)
+    .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+')';}).join('\n');
   var pt = ptMain;
   var pr = prio==='votos'?'priorizar los mas votados':prio==='ninos'?'priorizar aptos para ninos':'agrupar por zona geografica';
 
@@ -2308,10 +2309,12 @@ function generateItinerary() {
   var SHOP_CATS2  = ['compras','mercado'];
   var ptSight = nonVisited2.filter(function(p){ return SIGHT_CATS2.indexOf(p.cat) > -1; })
     .sort(function(a,b){return b.votes-a.votes;})
-    .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.cat+(p.votes?', '+p.votes+' votos':'')+')';}).join('\n');
+    .slice(0, 25)
+    .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.cat+(p.votes?', '+p.votes+'v':'')+')';}).join('\n');
   var ptShop = nonVisited2.filter(function(p){ return SHOP_CATS2.indexOf(p.cat) > -1; })
     .sort(function(a,b){return b.votes-a.votes;})
-    .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+', '+p.cat+')';}).join('\n');
+    .slice(0, 10)
+    .map(function(p){return '- '+p.name+' ('+ZL[p.zone]+')';}).join('\n');
 
   var prompt = 'Eres experto en viajes familiares a Nueva York. Grupo: 8 adultos y 8 ninos de 5 a 15 anos.\n'+
     'Viaje: '+days+' dias, ritmo '+pace+'.\n'+
