@@ -2242,16 +2242,14 @@ function renderLocalItin(dayPlan, dateVal, pace) {
     var items = optimizeRoute(day.items);
     var routeUrl = mapsRouteUrl(items);
     var half = Math.ceil(items.length / 2);
+    var morningItems = items.slice(0, half);
+    var afternoonItems = items.slice(half);
 
-    html += '<div class="day-block"><h3>'+esc(title)+'</h3><ul>';
-    html += '<li class="itin-period" style="border:none">☀️ Mañana</li>';
-
-    items.forEach(function(p, j) {
-      if (j === half) html += '<li class="itin-period" style="border:none">🌆 Tarde</li>';
+    function renderPlaceItem(p) {
       var mu = mapsUrl(p.name, p.addr);
       var isVis = visited.indexOf(p.id) > -1;
       var emoji = CAT_EMOJI[p.cat] || '📍';
-      html += '<li class="itin-item'+(isVis?' itin-visited':'')+'" data-id="'+p.id+'">'+
+      return '<li class="itin-item'+(isVis?' itin-visited':'')+'" data-id="'+p.id+'">'+
         emoji+' <span class="itin-name">'+esc(p.name)+'</span>'+
         ' <span style="color:#555;font-size:0.72rem">'+p.cat+'</span>'+
         '<button class="btn-visto'+(isVis?' is-visited':'')+'" onclick="toggleVisitFromItin('+JSON.stringify(p.id)+',this)">'+(isVis?'✓ Visto':'Marcar visto')+'</button>'+
@@ -2259,7 +2257,25 @@ function renderLocalItin(dayPlan, dateVal, pace) {
         (p.notes?'<div style="color:#666;font-size:0.78rem">'+esc(p.notes)+'</div>':'')+
         '<a class="maps-link" href="'+mu+'" target="_blank" rel="noopener">Maps</a>'+
         '</li>';
-    });
+    }
+
+    function renderMealItem(label, p) {
+      var mu = mapsUrl(p.name, p.addr);
+      return '<li style="border-top:1px solid #2E2E2E;padding:8px 0 4px 0">'+
+        '<span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#F7E733">'+label+'</span> '+
+        '<span style="color:#ddd;font-size:0.9rem">'+esc(p.name)+'</span>'+
+        (p.notes?' <span style="color:#888;font-size:0.78rem">— '+esc(p.notes)+'</span>':'')+
+        ' <a class="maps-link" href="'+mu+'" target="_blank" rel="noopener">Maps</a>'+
+        '</li>';
+    }
+
+    html += '<div class="day-block"><h3>'+esc(title)+'</h3><ul>';
+    html += '<li class="itin-period" style="border:none">☀️ Mañana</li>';
+    morningItems.forEach(function(p){ html += renderPlaceItem(p); });
+    if (day.lunch) html += renderMealItem('🍽 Comida', day.lunch);
+    html += '<li class="itin-period" style="border:none">🌆 Tarde</li>';
+    afternoonItems.forEach(function(p){ html += renderPlaceItem(p); });
+    if (day.dinner) html += renderMealItem('🍽 Cena', day.dinner);
 
     var tip = '';
     if (pace === 'relajado') {
@@ -2339,36 +2355,31 @@ function generateItinerary() {
 
   var prompt = 'Eres experto en viajes familiares a Nueva York. Grupo: 8 adultos y 8 ninos de 5 a 15 anos.\n'+
     'Viaje: '+days+' dias, ritmo '+pace+'.\n'+
-    '\nCONTEXTO DEL VIAJE:\n'+
-    '- Dia 1 (28 marzo sabado): llegada noche, solo hotel, SIN actividades.\n'+
-    '- Dias completos: 29 marzo (domingo) al 3 abril (viernes) — 6 dias para turismo.\n'+
-    '- Dia 8 (4 abril sabado): salida antes 11h, solo desayuno/checkout.\n'+
+    '\nCONTEXTO:\n'+
+    '- Dia 1 (28 marzo): llegada noche — sites:[], lunch:null, dinner:null\n'+
+    '- Dias completos: 29 marzo al 3 abril — 6 dias para turismo\n'+
+    '- Dia 8 (4 abril): salida antes 11h — sites:[], lunch:null, dinner:null\n'+
     lockedInfo+
-    '\nREGLAS ESTRICTAS — DEBES CUMPLIRLAS TODAS:\n'+
-    '1. OBLIGATORIO: incluye CADA UNO de los sitios de las listas. No puedes omitir ninguno.\n'+
-    '2. Si hay mas sitios que huecos, pon varios en el mismo bloque horario o extiende los dias.\n'+
-    '3. Las tiendas van siempre en la tarde, nunca un dia entero de compras.\n'+
-    '4. Agrupa por zona geografica para minimizar desplazamientos.\n'+
-    '5. Manana: turismo/museos/parques. Tarde: mas turismo + tiendas de la zona.\n'+
-    '\nSITIOS DE TURISMO (museos, parques, monumentos, actividades):\n'+ptSight+'\n'+
-    '\nTIENDAS Y MERCADOS (solo en tarde, distribuidas entre los dias):\n'+(ptShop||'(ninguna)')+'\n'+
-    (ptRest?'\nRESTAURANTES (sugerir 1-2 al final de cada dia segun zona, no como plan fijo):\n'+ptRest+'\n':'')+
-    '\nFORMATO OBLIGATORIO para cada dia (sin markdown, sin asteriscos, sin #):\n'+
-    'DIA X - DiaNombre DD/M\n'+
-    '☀️ Mañana\n'+
-    '- Sitio 1\n'+
-    '- Sitio 2\n'+
-    'Comida: Nombre restaurante (zona)\n'+
-    '🌆 Tarde\n'+
-    '- Sitio 3\n'+
-    '- Tienda 1\n'+
-    'Cena: Nombre restaurante (zona)\n'+
-    '\nUsa exactamente ese formato. Sin texto extra entre dias. En espanol.';
+    '\nREGLAS:\n'+
+    '1. Incluye TODOS los sitios de turismo y tiendas. No omitas ninguno.\n'+
+    '2. Tiendas solo en tarde. Turismo en manana y tarde.\n'+
+    '3. Agrupa por zona geografica.\n'+
+    '4. lunch y dinner: elige de la lista de restaurantes segun la zona del dia.\n'+
+    '\nSITIOS TURISMO:\n'+ptSight+'\n'+
+    '\nTIENDAS:\n'+(ptShop||'(ninguna)')+'\n'+
+    (ptRest?'\nRESTAURANTES (solo para lunch/dinner):\n'+ptRest+'\n':'')+
+    '\nRespuesta: SOLO JSON valido, sin texto antes ni despues. Formato exacto:\n'+
+    '[{"day":1,"sites":["Nombre exacto 1","Nombre exacto 2"],"lunch":"Nombre restaurante","dinner":"Nombre restaurante"},{"day":2,...}]\n'+
+    'Los nombres deben ser EXACTAMENTE como aparecen en las listas. '+days+' objetos en el array.';
 
   callGroq(prompt)
   .catch(function(){ return callGemini(prompt); })
   .then(function(text){
-    renderItin(text);
+    var jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error('sin JSON');
+    var aiDays = JSON.parse(jsonMatch[0]);
+    var dayPlan = buildDayPlanFromAI(aiDays);
+    renderLocalItin(dayPlan, dateVal, pace);
     toast('Itinerario generado con IA');
   })
   .catch(function(err){
@@ -2393,6 +2404,41 @@ function findPlaceInLine(line) {
     if (low.indexOf(pn) > -1 && pn.length > bestLen) { best = p; bestLen = pn.length; }
   });
   return best;
+}
+
+function findPlaceByName(name) {
+  if (!name) return null;
+  var low = name.toLowerCase().trim();
+  var best = null, bestScore = 0;
+  places.forEach(function(p) {
+    if (!p.name) return;
+    var pn = p.name.toLowerCase();
+    if (pn === low && bestScore < 3) { best = p; bestScore = 3; }
+    else if (low.indexOf(pn) > -1 && pn.length > 3 && bestScore < 2) { best = p; bestScore = 2; }
+    else if (pn.indexOf(low) > -1 && low.length > 3 && bestScore < 1) { best = p; bestScore = 1; }
+  });
+  return best;
+}
+
+function buildDayPlanFromAI(aiDays) {
+  return aiDays.map(function(d, i) {
+    var tripDay = TRIP_DAYS[i];
+    if (tripDay && lockedDays[tripDay.key]) {
+      return { locked: true, lockedTitle: lockedDays[tripDay.key].title };
+    }
+    if (d.locked) return { locked: true, lockedTitle: d.lockedTitle || 'Plan privado' };
+
+    var items = (d.sites || []).map(findPlaceByName).filter(Boolean);
+    var lunch = d.lunch ? findPlaceByName(d.lunch) : null;
+    var dinner = d.dinner ? findPlaceByName(d.dinner) : null;
+
+    var zoneCounts = {};
+    items.forEach(function(p) { zoneCounts[p.zone] = (zoneCounts[p.zone] || 0) + 1; });
+    var mainZone = 'manhattan', maxC = 0;
+    for (var z in zoneCounts) { if (zoneCounts[z] > maxC) { maxC = zoneCounts[z]; mainZone = z; } }
+
+    return { zone: mainZone, items: items, lunch: lunch, dinner: dinner, rests: [] };
+  });
 }
 
 function renderItin(text) {
