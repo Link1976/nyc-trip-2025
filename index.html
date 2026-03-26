@@ -584,6 +584,7 @@
 var API_KEY_SK = 'nyc_gemini_api_key';
 var GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=';
 var _geminiKeyFromFirebase = ''; // loaded at startup from Firebase /config/geminiKey
+var _geminiKeyLoad = null; // Promise que resuelve cuando la key está lista
 
 function getApiKey() {
   // Firebase key takes priority (shared for all users), localStorage as fallback
@@ -598,12 +599,15 @@ function _geminiText(data) {
 }
 
 function callGemini(prompt) {
-  var key = getApiKey();
-  if (!key) return Promise.reject(new Error('Sin API key'));
-  return fetch(GEMINI_URL + key, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({contents:[{parts:[{text: prompt}]}]})
+  var keyLoad = _geminiKeyLoad || Promise.resolve();
+  return keyLoad.then(function() {
+    var key = getApiKey();
+    if (!key) throw new Error('Sin API key');
+    return fetch(GEMINI_URL + key, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({contents:[{parts:[{text: prompt}]}]})
+    });
   })
   .then(function(r){return r.json();})
   .then(function(data){
@@ -1064,7 +1068,7 @@ try {
   fbDb = firebase.database();
   fbReady = true;
   // Load shared Gemini key from Firebase (set once by admin in Firebase Console)
-  fbDb.ref('config/geminiKey').once('value', function(snap) {
+  _geminiKeyLoad = fbDb.ref('config/geminiKey').once('value').then(function(snap) {
     var k = snap.val();
     if (k && typeof k === 'string' && k.length > 10) {
       _geminiKeyFromFirebase = k;
@@ -2313,10 +2317,11 @@ function generateItinerary() {
     toast('Itinerario generado con IA');
   })
   .catch(function(err){
+    console.error('Gemini error:', err);
     var dayPlan = buildLocalItinerary(days, pace, prio, dateVal);
     if (dayPlan.length > 0) {
       renderLocalItin(dayPlan, dateVal, pace);
-      toast('Itinerario generado (modo local)');
+      toast('Modo local — Error IA: ' + (err.message || err));
     } else {
       out.innerHTML='<div style="color:var(--accent);padding:20px">No se pudo generar el itinerario. Anade mas sitios e intentalo de nuevo.</div>';
     }
