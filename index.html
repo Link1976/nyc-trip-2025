@@ -607,7 +607,7 @@ function callGroq(prompt) {
     return fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
-      body: JSON.stringify({model: 'llama-3.3-70b-versatile', messages: [{role: 'user', content: prompt}]})
+      body: JSON.stringify({model: 'llama-3.3-70b-versatile', messages: [{role: 'user', content: prompt}], max_tokens: 8000})
     });
   })
   .then(function(r){return r.json();})
@@ -2344,13 +2344,12 @@ function generateItinerary() {
     '- Dias completos: 29 marzo (domingo) al 3 abril (viernes) — 6 dias para turismo.\n'+
     '- Dia 8 (4 abril sabado): salida antes 11h, solo desayuno/checkout.\n'+
     lockedInfo+
-    '\nREGLAS ESTRICTAS PARA EL ITINERARIO:\n'+
-    '1. INCLUYE TODOS los sitios de la lista — no omitas ninguno. Distribuye todos entre los dias disponibles.\n'+
-    '2. NUNCA pongas un dia entero de tiendas. Las tiendas van siempre en la tarde, despues del turismo.\n'+
-    '3. Cada dia libre: manana con 2-4 sitios de turismo/museos/parques agrupados por zona geografica.\n'+
-    '4. Tarde: continuar turismo y anadir 1-2 tiendas/mercados si estan en la misma zona.\n'+
-    '5. Orden logico geografico: minimiza desplazamientos, agrupa sitios cercanos entre si.\n'+
-    '6. Distribuye las tiendas a lo largo de todos los dias, no las concentres en uno solo.\n'+
+    '\nREGLAS ESTRICTAS — DEBES CUMPLIRLAS TODAS:\n'+
+    '1. OBLIGATORIO: incluye CADA UNO de los sitios de las listas. No puedes omitir ninguno.\n'+
+    '2. Si hay mas sitios que huecos, pon varios en el mismo bloque horario o extiende los dias.\n'+
+    '3. Las tiendas van siempre en la tarde, nunca un dia entero de compras.\n'+
+    '4. Agrupa por zona geografica para minimizar desplazamientos.\n'+
+    '5. Manana: turismo/museos/parques. Tarde: mas turismo + tiendas de la zona.\n'+
     '\nSITIOS DE TURISMO (museos, parques, monumentos, actividades):\n'+ptSight+'\n'+
     '\nTIENDAS Y MERCADOS (solo en tarde, distribuidas entre los dias):\n'+(ptShop||'(ninguna)')+'\n'+
     (ptRest?'\nRESTAURANTES (sugerir 1-2 al final de cada dia segun zona, no como plan fijo):\n'+ptRest+'\n':'')+
