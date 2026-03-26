@@ -2272,9 +2272,10 @@ function renderLocalItin(dayPlan, dateVal, pace) {
     html += '<li style="color:#666;font-style:italic;border:none">Consejo: '+tip+'</li>';
 
     if (day.rests && day.rests.length) {
-      html += '<li style="border:none;padding-top:6px"><span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#888">Donde comer en la zona</span><ul style="margin:4px 0 0 0;padding-left:16px">';
+      html += '<li style="border:none;padding-top:6px"><span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#ccc">🍽 Donde comer en la zona</span><ul style="margin:4px 0 0 0;padding-left:16px">';
       day.rests.forEach(function(r){
-        html += '<li style="font-size:0.82rem;color:#aaa;border:none;padding:2px 0">'+esc(r.name)+(r.notes?' — '+esc(r.notes):'')+'</li>';
+        var mu = mapsUrl(r.name, r.addr);
+        html += '<li style="font-size:0.85rem;color:#ddd;border:none;padding:3px 0">'+esc(r.name)+(r.notes?' — <span style="color:#aaa">'+esc(r.notes)+'</span>':'')+'<a class="maps-link" href="'+mu+'" target="_blank" rel="noopener" style="margin-left:6px">Maps</a></li>';
       });
       html += '</ul></li>';
     }
@@ -2344,11 +2345,12 @@ function generateItinerary() {
     '- Dia 8 (4 abril sabado): salida antes 11h, solo desayuno/checkout.\n'+
     lockedInfo+
     '\nREGLAS ESTRICTAS PARA EL ITINERARIO:\n'+
-    '1. NUNCA pongas un dia entero de tiendas. Las tiendas van siempre en la tarde, despues del turismo.\n'+
-    '2. Cada dia libre: manana con 2-4 sitios de turismo/museos/parques agrupados por zona geografica.\n'+
-    '3. Tarde: continuar turismo y anadir opcionalmente 1-2 tiendas/mercados si estan en la misma zona.\n'+
-    '4. Orden logico geografico: minimiza desplazamientos, agrupa sitios cercanos entre si.\n'+
-    '5. Distribuye las tiendas a lo largo de todos los dias, no las concentres en uno solo.\n'+
+    '1. INCLUYE TODOS los sitios de la lista — no omitas ninguno. Distribuye todos entre los dias disponibles.\n'+
+    '2. NUNCA pongas un dia entero de tiendas. Las tiendas van siempre en la tarde, despues del turismo.\n'+
+    '3. Cada dia libre: manana con 2-4 sitios de turismo/museos/parques agrupados por zona geografica.\n'+
+    '4. Tarde: continuar turismo y anadir 1-2 tiendas/mercados si estan en la misma zona.\n'+
+    '5. Orden logico geografico: minimiza desplazamientos, agrupa sitios cercanos entre si.\n'+
+    '6. Distribuye las tiendas a lo largo de todos los dias, no las concentres en uno solo.\n'+
     '\nSITIOS DE TURISMO (museos, parques, monumentos, actividades):\n'+ptSight+'\n'+
     '\nTIENDAS Y MERCADOS (solo en tarde, distribuidas entre los dias):\n'+(ptShop||'(ninguna)')+'\n'+
     (ptRest?'\nRESTAURANTES (sugerir 1-2 al final de cada dia segun zona, no como plan fijo):\n'+ptRest+'\n':'')+
