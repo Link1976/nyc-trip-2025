@@ -249,6 +249,15 @@
   .rain-mode .outdoor-site .itin-name { text-decoration: line-through; }
   .btn-rain { background:none; border:1px solid #444; color:#888; font-size:0.8rem; padding:6px 14px; border-radius:6px; cursor:pointer; margin-left:8px; font-family:'DM Sans',sans-serif; }
   .btn-rain.active { border-color:#60a5fa; color:#60a5fa; }
+  .rain-pill { border:1px solid #3a3a3a; background:var(--mid); color:#666; border-radius:8px; padding:8px 10px; cursor:pointer; font-size:0.75rem; font-family:'DM Sans',sans-serif; text-align:center; min-width:78px; transition:all 0.2s; line-height:1.3; }
+  .rain-pill .pill-day { font-family:'Bebas Neue',sans-serif; font-size:1rem; display:block; }
+  .rain-pill:hover { border-color:#555; color:#aaa; }
+  .rain-pill.rainy { background:rgba(96,165,250,0.12); border-color:#60a5fa; color:#60a5fa; }
+  .rain-pill.rainy .pill-day { color:#60a5fa; }
+  .day-block.is-rainy { border-left-color:#60a5fa; }
+  .day-block.is-rainy h3 { color:#60a5fa; }
+  .day-block.is-rainy .outdoor-site { opacity:0.35; }
+  .day-block.is-rainy .outdoor-site .itin-name { text-decoration:line-through; }
   .btn-visto { background:none; border:1px solid #444; color:#888; font-size:0.68rem; padding:2px 7px; border-radius:4px; cursor:pointer; margin-left:6px; vertical-align:middle; font-family:'DM Sans',sans-serif; }
   .btn-visto.is-visited { border-color:#3DDC84; color:#3DDC84; }
   .itin-period { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#666; margin:8px 0 4px; }
@@ -478,6 +487,12 @@
     </div>
 
     <div class="card">
+      <div class="card-title">Dias de lluvia &#9928;&#65039;</div>
+      <p style="font-size:0.75rem;color:#555;margin-bottom:12px;line-height:1.6">Marca los dias que vayan a llover. La IA asignara solo sitios de interior (museos, actividades, tiendas) en esos dias.</p>
+      <div class="lock-days-row" id="rain-days-row"></div>
+    </div>
+
+    <div class="card">
       <div class="card-title">Configurar itinerario</div>
       <div class="itin-controls">
         <div class="itin-group">
@@ -506,7 +521,6 @@
         </div>
       </div>
       <button class="btn btn-red" id="gen-btn" onclick="generateItinerary()">Generar con IA</button>
-      <button class="btn-rain" id="rain-btn" onclick="toggleRainMode()">☁️ Lluvia</button>
     </div>
     <div id="itin-output"></div>
   </div>
@@ -713,6 +727,7 @@ var filter = 'all';
 var catFilter = 'all';
 var extracted = [];
 var lockedDays = {}; // { 'YYYY-MM-DD': { title: string } }
+var rainyDays = {}; // { 'YYYY-MM-DD': true }
 
 // Tags
 var TAGS = ['turismo','shopping','restaurante','museo'];
@@ -1140,6 +1155,7 @@ function load() {
   places.forEach(function(p){ enrichPlace(p); });
 
   try { lockedDays = JSON.parse(localStorage.getItem('nyc_locked_v1')) || {}; } catch(e) { lockedDays = {}; }
+  try { rainyDays = JSON.parse(localStorage.getItem('nyc_rainy_v1')) || {}; } catch(e) { rainyDays = {}; }
 
   // Then subscribe to Firebase for real-time sync
   if (fbReady) {
@@ -1150,6 +1166,15 @@ function load() {
         lockedDays = data;
         try { localStorage.setItem('nyc_locked_v1', JSON.stringify(lockedDays)); } catch(e) {}
         renderLockDays();
+      }
+    });
+    fbDb.ref('rainyDays').on('value', function(snapshot) {
+      if (Date.now() - fbSaving < 2000) return;
+      var data = snapshot.val();
+      if (data && typeof data === 'object') {
+        rainyDays = data;
+        try { localStorage.setItem('nyc_rainy_v1', JSON.stringify(rainyDays)); } catch(e) {}
+        renderRainyDays();
       }
     });
     fbDb.ref('places').on('value', function(snapshot) {
@@ -1204,6 +1229,7 @@ function save() {
     localStorage.setItem(VK, JSON.stringify(voted));
   } catch(e) {}
   try { localStorage.setItem('nyc_locked_v1', JSON.stringify(lockedDays)); } catch(e) {}
+  try { localStorage.setItem('nyc_rainy_v1', JSON.stringify(rainyDays)); } catch(e) {}
   try { localStorage.setItem('nyc_visited_v1', JSON.stringify(visited)); } catch(e) {}
   if (fbReady) {
     fbSaving = Date.now();
@@ -1211,6 +1237,7 @@ function save() {
     fbDb.ref('voted').set(voted);
     fbDb.ref('visited').set(visited);
     fbDb.ref('lockedDays').set(lockedDays);
+    fbDb.ref('rainyDays').set(rainyDays);
   }
 }
 
@@ -1678,6 +1705,27 @@ function renderLockDays() {
   '</div>';
 }
 
+function toggleRainyDay(key) {
+  if (rainyDays[key]) {
+    delete rainyDays[key];
+  } else {
+    rainyDays[key] = true;
+  }
+  save(); renderRainyDays();
+}
+
+function renderRainyDays() {
+  var row = document.getElementById('rain-days-row');
+  if (!row) return;
+  row.innerHTML = TRIP_DAYS.map(function(d) {
+    var isRainy = !!rainyDays[d.key];
+    return '<button class="rain-pill'+(isRainy?' rainy':'')+'" onclick="toggleRainyDay(\''+d.key+'\')">'+
+      '<span class="pill-day">'+d.label+' '+d.date+'/'+d.month+'</span>'+
+      (isRainy?'&#9928;&#65039;':'&#9729;')+
+    '</button>';
+  }).join('');
+}
+
 function switchTab(tab, btn) {
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
@@ -2092,16 +2140,25 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
     restByZone[p.zone].push(p);
   });
   var sorted = allNonVisited.filter(function(p){ return p.cat !== 'restaurante'; });
+
   // Identify locked day indices (0-based)
   var lockedIndices = {};
   if (dateVal) {
     TRIP_DAYS.forEach(function(d, i) {
       if (i < days && lockedDays[d.key]) lockedIndices[i] = lockedDays[d.key].title || 'Plan privado';
     });
+    // Auto-lock arrival (day 0) and departure (last day) to match AI behavior
+    if (lockedIndices[0] === undefined) lockedIndices[0] = 'Llegada — noche';
+    if (days >= 2 && lockedIndices[days-1] === undefined) lockedIndices[days-1] = 'Salida — antes de las 11h';
   }
-  // Distribute all sites across available days (never leave sites out)
-  var freeDays = days - Object.keys(lockedIndices).length;
-  var maxPerDay = Math.max(paceCap, freeDays > 0 ? Math.ceil(sorted.length / freeDays) : paceCap);
+
+  // Identify rainy day indices (0-based)
+  var rainyIndices = {};
+  if (dateVal) {
+    TRIP_DAYS.forEach(function(d, i) {
+      if (i < days && rainyDays[d.key] && lockedIndices[i] === undefined) rainyIndices[i] = true;
+    });
+  }
 
   if (prio === 'votos') {
     sorted.sort(function(a,b){ return b.votes - a.votes; });
@@ -2115,18 +2172,18 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
   }
 
   if (prio === 'zona') {
+    var freeDaysZ = days - Object.keys(lockedIndices).length;
+    var maxPerDay = Math.max(paceCap, freeDaysZ > 0 ? Math.ceil(sorted.length / freeDaysZ) : paceCap);
     var zoneGroups = {};
     VZ.forEach(function(z){ zoneGroups[z] = []; });
     sorted.forEach(function(p){ if(zoneGroups[p.zone]) zoneGroups[p.zone].push(p); });
     var dayPlan = [];
-    var dayNum = 0;
     var zIdx = 0; var zKeys = VZ.slice(); var zItemIdx = 0;
     for (var di = 0; di < days; di++) {
       if (lockedIndices[di] !== undefined) {
         dayPlan.push({ locked: true, lockedTitle: lockedIndices[di], items: [] });
-        dayNum++; continue;
+        continue;
       }
-      // find next non-empty zone batch
       var placed = false;
       while (zIdx < zKeys.length && !placed) {
         var z = zKeys[zIdx];
@@ -2134,43 +2191,55 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
         items.sort(function(a,b){ return b.votes - a.votes; });
         var batch = items.slice(zItemIdx, zItemIdx + maxPerDay);
         if (batch.length) {
-          dayPlan.push({ zone: z, items: batch, rests: (restByZone[z]||[]).slice(0,2) });
+          dayPlan.push({ zone: z, items: batch, rests: (restByZone[z]||[]).slice(0,2), isRainy: !!rainyIndices[di] });
           zItemIdx += maxPerDay;
           if (zItemIdx >= items.length) { zIdx++; zItemIdx = 0; }
           placed = true;
         } else { zIdx++; zItemIdx = 0; }
       }
       if (!placed) {
-        // sin sitios pero puede haber dias bloqueados pendientes — no cortar
         if (Object.keys(lockedIndices).some(function(k){ return parseInt(k) > di; })) continue;
         break;
       }
-      dayNum++;
     }
     return dayPlan;
   }
 
-  // Separar turismo y tiendas para distribuir equitativamente cada dia
-  var SIGHT_CATS = ['museo','foto','cultura','parque','actividad'];
-  var SHOP_CATS  = ['compras','mercado'];
-  var sightPool = sorted.filter(function(p){ return SIGHT_CATS.indexOf(p.cat) > -1; });
-  var shopPool  = sorted.filter(function(p){ return SHOP_CATS.indexOf(p.cat) > -1; });
-  var otherPool = sorted.filter(function(p){ return SIGHT_CATS.indexOf(p.cat) === -1 && SHOP_CATS.indexOf(p.cat) === -1; });
+  // Count free days split by rainy/normal
+  var rainyFreeCount = 0, normalFreeCount = 0;
+  for (var d = 0; d < days; d++) {
+    if (lockedIndices[d] !== undefined) continue;
+    if (rainyIndices[d]) rainyFreeCount++;
+    else normalFreeCount++;
+  }
+  var totalFreeDays = Math.max(rainyFreeCount + normalFreeCount, 1);
 
-  var freeDays = Math.max(days - Object.keys(lockedIndices).length, 1);
-  var sightPerDay = Math.max(3, Math.ceil((sightPool.length + otherPool.length) / freeDays));
-  var shopPerDay  = Math.max(1, Math.ceil(shopPool.length / freeDays));
+  // Split sites into indoor (safe for rain) and outdoor
+  var indoorPool = sorted.filter(function(p){ return !!CAT_INDOOR[p.cat]; });
+  var outdoorPool = sorted.filter(function(p){ return !CAT_INDOOR[p.cat]; });
+
+  // Assign indoor sites preferentially to rainy days; overflow + outdoor go to normal days
+  var indoorPerRainy = rainyFreeCount > 0 ? Math.max(3, Math.ceil(indoorPool.length / rainyFreeCount)) : 0;
+  var indoorForRainy = rainyFreeCount > 0 ? indoorPool.slice(0, rainyFreeCount * indoorPerRainy) : [];
+  var indoorOverflow = rainyFreeCount > 0 ? indoorPool.slice(rainyFreeCount * indoorPerRainy) : indoorPool;
+  var normalPool = indoorOverflow.concat(outdoorPool);
+  var normalPerDay = normalFreeCount > 0 ? Math.max(3, Math.ceil(normalPool.length / normalFreeCount)) : 0;
 
   var dayPlan = [];
-  var usedSight = 0, usedShop = 0;
+  var usedRainy = 0, usedNormal = 0;
   for (var d = 0; d < days; d++) {
     if (lockedIndices[d] !== undefined) {
       dayPlan.push({ locked: true, lockedTitle: lockedIndices[d], items: [] });
       continue;
     }
-    var sightBatch = sightPool.concat(otherPool).slice(usedSight, usedSight + sightPerDay);
-    var shopBatch  = shopPool.slice(usedShop, usedShop + shopPerDay);
-    var batch = sightBatch.concat(shopBatch);
+    var batch;
+    if (rainyIndices[d]) {
+      batch = indoorForRainy.slice(usedRainy, usedRainy + indoorPerRainy);
+      usedRainy += indoorPerRainy;
+    } else {
+      batch = normalPool.slice(usedNormal, usedNormal + normalPerDay);
+      usedNormal += normalPerDay;
+    }
     if (!batch.length) {
       if (Object.keys(lockedIndices).some(function(k){ return parseInt(k) > d; })) continue;
       break;
@@ -2179,9 +2248,7 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
     batch.forEach(function(p){ zoneCounts[p.zone] = (zoneCounts[p.zone]||0) + 1; });
     var mainZone = 'manhattan', maxC = 0;
     for (var z in zoneCounts) { if (zoneCounts[z] > maxC) { maxC = zoneCounts[z]; mainZone = z; } }
-    dayPlan.push({ zone: mainZone, items: batch, rests: (restByZone[mainZone]||[]).slice(0,2) });
-    usedSight += sightPerDay;
-    usedShop  += shopPerDay;
+    dayPlan.push({ zone: mainZone, items: batch, rests: (restByZone[mainZone]||[]).slice(0,2), isRainy: !!rainyIndices[d] });
   }
   return dayPlan;
 }
@@ -2247,6 +2314,7 @@ function renderLocalItin(dayPlan, dateVal, pace) {
       return;
     }
 
+    if (day.isRainy) title += ' \u2614 Lluvia';
     title += ' -- Zona: ' + ZL[day.zone];
 
     var items = optimizeRoute(day.items);
@@ -2286,11 +2354,11 @@ function renderLocalItin(dayPlan, dateVal, pace) {
         '</li>';
     }
 
-    html += '<div class="day-block"><h3>'+esc(title)+'</h3><ul>';
-    html += '<li class="itin-period" style="border:none">☀️ Mañana</li>';
+    html += '<div class="day-block'+(day.isRainy?' is-rainy':'')+'"><h3>'+esc(title)+'</h3><ul>';
+    html += '<li class="itin-period" style="border:none">'+(day.isRainy?'&#9928;&#65039; Solo interiores':'&#9728;&#65039; Mañana')+'</li>';
     morningItems.forEach(function(p){ html += renderPlaceItem(p); });
     if (day.lunch) html += renderMealItem('🍽 Comida', day.lunch);
-    html += '<li class="itin-period" style="border:none">🌆 Tarde</li>';
+    html += '<li class="itin-period" style="border:none">'+(day.isRainy?'&#9928;&#65039; Tarde interior':'🌆 Tarde')+'</li>';
     afternoonItems.forEach(function(p){ html += renderPlaceItem(p); });
     if (day.dinner) html += renderMealItem('🍽 Cena', day.dinner);
 
@@ -2373,6 +2441,20 @@ function generateItinerary() {
   var maxMinPerDay = MAX_MIN[pace] || 450;
   var activeDays = 6; // dias completos de turismo
 
+  // Build rainy days context
+  var rainyInfo = '';
+  if (dateVal) {
+    var rainyLines = [];
+    TRIP_DAYS.forEach(function(d, i) {
+      if (rainyDays[d.key] && !lockedDays[d.key]) {
+        rainyLines.push('- '+d.label+' '+d.date+'/'+d.month+' (dia '+(i+1)+'): LLUVIA — asignar SOLO sitios de INTERIOR (museo, actividad, compras, mercado, cultura). NO parques ni miradores/foto.');
+      }
+    });
+    if (rainyLines.length) {
+      rainyInfo = '\nDias de lluvia (SOLO sitios de interior):\n'+rainyLines.join('\n')+'\n';
+    }
+  }
+
   var prompt = 'Eres experto en viajes familiares a Nueva York. Grupo: 8 adultos y 8 ninos de 5 a 15 anos.\n'+
     'Viaje: '+days+' dias, ritmo '+pace+'.\n'+
     '\nCONTEXTO:\n'+
@@ -2380,6 +2462,7 @@ function generateItinerary() {
     '- Dias completos: 29 marzo al 3 abril — '+activeDays+' dias para turismo\n'+
     '- Dia 8 (4 abril): salida antes 11h — sites:[], lunch:null, dinner:null\n'+
     lockedInfo+
+    rainyInfo+
     '\nDURACIONES por categoria: museo=1h, actividad=1.5h, parque=1h, foto=20min, cultura=45min, compras=45min, mercado=45min\n'+
     '\nREGLAS:\n'+
     '1. Maximo '+(maxMinPerDay/60)+'h por dia (ritmo '+pace+'). Distribuye uniformemente.\n'+
@@ -2455,6 +2538,16 @@ function findPlaceByName(name) {
     else if (low.indexOf(pn) > -1 && pn.length > 3 && bestScore < 2) { best = p; bestScore = 2; }
     else if (pn.indexOf(low) > -1 && low.length > 3 && bestScore < 1) { best = p; bestScore = 1; }
   });
+  // Fuzzy fallback: use sim() for names the AI slightly rephrased
+  if (!best) {
+    var simBest = null, simScore = 0;
+    places.forEach(function(p) {
+      if (!p.name) return;
+      var s = sim(p.name, name);
+      if (s > 0.6 && s > simScore) { simBest = p; simScore = s; }
+    });
+    if (simBest) best = simBest;
+  }
   return best;
 }
 
@@ -2475,7 +2568,8 @@ function buildDayPlanFromAI(aiDays) {
     var mainZone = 'manhattan', maxC = 0;
     for (var z in zoneCounts) { if (zoneCounts[z] > maxC) { maxC = zoneCounts[z]; mainZone = z; } }
 
-    return { zone: mainZone, items: items, lunch: lunch, dinner: dinner, rests: [] };
+    var isRainy = tripDay ? !!rainyDays[tripDay.key] : false;
+    return { zone: mainZone, items: items, lunch: lunch, dinner: dinner, rests: [], isRainy: isRainy };
   });
 }
 
@@ -2683,6 +2777,7 @@ function locateMe() {
 load(); render();
 try{document.getElementById('cfg-date').value='2026-03-28';}catch(e){}
 renderLockDays();
+renderRainyDays();
 
 // Show sync status
 var syncEl = document.getElementById('sync-status');
