@@ -249,6 +249,13 @@
   .rain-mode .outdoor-site .itin-name { text-decoration: line-through; }
   .btn-rain { background:none; border:1px solid #444; color:#888; font-size:0.8rem; padding:6px 14px; border-radius:6px; cursor:pointer; margin-left:8px; font-family:'DM Sans',sans-serif; }
   .btn-rain.active { border-color:#60a5fa; color:#60a5fa; }
+  .btn-regen { background:none; border:1px solid #3a3a3a; color:#555; font-size:0.7rem; padding:3px 9px; border-radius:5px; cursor:pointer; font-family:'DM Sans',sans-serif; margin-left:8px; vertical-align:middle; transition:all 0.2s; }
+  .btn-regen:hover { border-color:#888; color:#bbb; }
+  .day-time-badge { font-size:0.72rem; padding:2px 8px; border-radius:4px; margin-left:6px; font-family:'DM Sans',sans-serif; font-weight:700; vertical-align:middle; }
+  .time-ok   { background:rgba(61,220,132,0.15); color:#3DDC84; }
+  .time-warn { background:rgba(247,231,51,0.15);  color:#F7E733; }
+  .time-over { background:rgba(231,76,60,0.18);   color:#E74C3C; }
+  .btn-export { background:none; border:1px solid #3DDC84; color:#3DDC84; font-size:0.82rem; padding:9px 20px; border-radius:6px; cursor:pointer; font-family:'DM Sans',sans-serif; }
   .rain-pill { border:1px solid #3a3a3a; background:var(--mid); color:#666; border-radius:8px; padding:8px 10px; cursor:pointer; font-size:0.75rem; font-family:'DM Sans',sans-serif; text-align:center; min-width:78px; transition:all 0.2s; line-height:1.3; }
   .rain-pill .pill-day { font-family:'Bebas Neue',sans-serif; font-size:1rem; display:block; }
   .rain-pill:hover { border-color:#555; color:#aaa; }
@@ -522,6 +529,9 @@
       </div>
       <button class="btn btn-red" id="gen-btn" onclick="generateItinerary()">Generar con IA</button>
     </div>
+    <div id="itin-toolbar" style="display:none;padding:4px 0 8px 0">
+      <button class="btn-export" onclick="exportItinerary()">&#128203; Copiar itinerario para WhatsApp</button>
+    </div>
     <div id="itin-output"></div>
   </div>
 
@@ -728,6 +738,9 @@ var catFilter = 'all';
 var extracted = [];
 var lockedDays = {}; // { 'YYYY-MM-DD': { title: string } }
 var rainyDays = {}; // { 'YYYY-MM-DD': true }
+var currentDayPlan = null;
+var currentDateVal = '';
+var currentPace = 'normal';
 
 // Tags
 var TAGS = ['turismo','shopping','restaurante','museo'];
@@ -2317,8 +2330,16 @@ function toggleVisitFromItin(id, btn) {
 }
 
 function renderLocalItin(dayPlan, dateVal, pace) {
+  // Store state for regenerate and export
+  currentDayPlan = dayPlan;
+  currentDateVal = dateVal;
+  currentPace    = pace;
+  var toolbar = document.getElementById('itin-toolbar');
+  if (toolbar) toolbar.style.display = '';
+
   var dayNames = ['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
   var startDate = dateVal ? new Date(dateVal + 'T12:00:00') : null;
+  var maxMin = MAX_MIN[pace] || 450;
   var html = '';
 
   dayPlan.forEach(function(day, i) {
@@ -2338,7 +2359,16 @@ function renderLocalItin(dayPlan, dateVal, pace) {
     }
 
     if (day.isRainy) title += ' \u2614 Lluvia';
-    title += ' -- Zona: ' + ZL[day.zone];
+    title += ' \u2014 Zona: ' + ZL[day.zone];
+
+    // --- Feature 1: tiempo estimado del dia ---
+    var totalMin = (day.items || []).reduce(function(s, p) {
+      return s + (CAT_DURATION[p.cat] || 30);
+    }, 0);
+    var tH = Math.floor(totalMin / 60), tM = totalMin % 60;
+    var timeTxt = '\u23F1 ~' + (tH ? tH + 'h' : '') + (tM ? (tH ? ' ' : '') + tM + 'min' : '');
+    var timeClass = totalMin <= maxMin ? 'time-ok' : totalMin <= maxMin * 1.2 ? 'time-warn' : 'time-over';
+    var timeBadge = '<span class="day-time-badge ' + timeClass + '">' + timeTxt + '</span>';
 
     var items = optimizeRoute(day.items);
     var routeUrl = mapsRouteUrl(items);
@@ -2354,13 +2384,13 @@ function renderLocalItin(dayPlan, dateVal, pace) {
       var durTxt = dur ? (dur >= 60 ? '~'+Math.round(dur/60)+'h' : '~'+dur+'min') : '';
       var isIndoor = CAT_INDOOR[p.cat];
       var rainClass = isIndoor ? '' : ' outdoor-site';
-      var rainBadge = isIndoor ? '<span class="rain-badge" title="Interior">🏛</span>' : '<span class="rain-badge" title="Exterior">🌳</span>';
+      var rainBadge = isIndoor ? '<span class="rain-badge" title="Interior">\uD83C\uDFDB</span>' : '<span class="rain-badge" title="Exterior">\uD83C\uDF33</span>';
       return '<li class="itin-item'+rainClass+(isVis?' itin-visited':'')+'" data-id="'+p.id+'">'+
         emoji+' <span class="itin-name">'+esc(p.name)+'</span>'+
         ' <span style="color:#555;font-size:0.72rem">'+p.cat+'</span>'+
         (durTxt?'<span class="dur-badge">'+durTxt+'</span>':'')+
         rainBadge+
-        '<button class="btn-visto'+(isVis?' is-visited':'')+'" onclick="toggleVisitFromItin('+JSON.stringify(p.id)+',this)">'+(isVis?'✓ Visto':'Marcar visto')+'</button>'+
+        '<button class="btn-visto'+(isVis?' is-visited':'')+'" onclick="toggleVisitFromItin('+JSON.stringify(p.id)+',this)">'+(isVis?'\u2713 Visto':'Marcar visto')+'</button>'+
         (p.addr?'<div class="place-addr">'+esc(p.addr)+'</div>':'')+
         (p.notes?'<div style="color:#666;font-size:0.78rem">'+esc(p.notes)+'</div>':'')+
         '<a class="maps-link" href="'+mu+'" target="_blank" rel="noopener">Maps</a>'+
@@ -2372,40 +2402,40 @@ function renderLocalItin(dayPlan, dateVal, pace) {
       return '<li style="border-top:1px solid #2E2E2E;padding:8px 0 4px 0">'+
         '<span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#F7E733">'+label+'</span> '+
         '<span style="color:#ddd;font-size:0.9rem">'+esc(p.name)+'</span>'+
-        (p.notes?' <span style="color:#888;font-size:0.78rem">— '+esc(p.notes)+'</span>':'')+
+        (p.notes?' <span style="color:#888;font-size:0.78rem">\u2014 '+esc(p.notes)+'</span>':'')+
         ' <a class="maps-link" href="'+mu+'" target="_blank" rel="noopener">Maps</a>'+
         '</li>';
     }
 
-    html += '<div class="day-block'+(day.isRainy?' is-rainy':'')+'"><h3>'+esc(title)+'</h3><ul>';
-    html += '<li class="itin-period" style="border:none">'+(day.isRainy?'&#9928;&#65039; Solo interiores':'&#9728;&#65039; Mañana')+'</li>';
-    morningItems.forEach(function(p){ html += renderPlaceItem(p); });
-    if (day.lunch) html += renderMealItem('🍽 Comida', day.lunch);
-    html += '<li class="itin-period" style="border:none">'+(day.isRainy?'&#9928;&#65039; Tarde interior':'🌆 Tarde')+'</li>';
-    afternoonItems.forEach(function(p){ html += renderPlaceItem(p); });
-    if (day.dinner) html += renderMealItem('🍽 Cena', day.dinner);
+    // --- Feature 2: boton regenerar dia ---
+    var regenBtn = '<button class="btn-regen" onclick="regenerateDay('+i+')" title="Intercambiar sitios con el dia siguiente">\uD83D\uDD04 Regenerar</button>';
 
-    var tip = '';
-    if (pace === 'relajado') {
-      tip = 'Dejar tiempo libre entre sitios para descanso de los mas pequenos';
-    } else if (day.zone === 'manhattan') {
-      tip = 'Combinar metro + caminar. Los ninos pequenos aguantan mejor en tramos cortos';
-    } else {
-      tip = 'Llevar snacks y agua. Planificar paradas para descansar';
-    }
+    html += '<div class="day-block'+(day.isRainy?' is-rainy':'')+'">'+
+      '<h3>'+esc(title)+timeBadge+regenBtn+'</h3><ul>';
+    html += '<li class="itin-period" style="border:none">'+(day.isRainy?'&#9928;&#65039; Solo interiores':'&#9728;&#65039; Ma\u00F1ana')+'</li>';
+    morningItems.forEach(function(p){ html += renderPlaceItem(p); });
+    if (day.lunch) html += renderMealItem('\uD83C\uDF7D Comida', day.lunch);
+    html += '<li class="itin-period" style="border:none">'+(day.isRainy?'&#9928;&#65039; Tarde interior':'\uD83C\uDF06 Tarde')+'</li>';
+    afternoonItems.forEach(function(p){ html += renderPlaceItem(p); });
+    if (day.dinner) html += renderMealItem('\uD83C\uDF7D Cena', day.dinner);
+
+    var tip = pace === 'relajado'
+      ? 'Dejar tiempo libre entre sitios para descanso de los mas pequenos'
+      : day.zone === 'manhattan'
+        ? 'Combinar metro + caminar. Los ninos pequenos aguantan mejor en tramos cortos'
+        : 'Llevar snacks y agua. Planificar paradas para descansar';
     html += '<li style="color:#666;font-style:italic;border:none">Consejo: '+tip+'</li>';
 
     if (day.rests && day.rests.length) {
-      html += '<li style="border:none;padding-top:6px"><span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#ccc">🍽 Donde comer en la zona</span><ul style="margin:4px 0 0 0;padding-left:16px">';
+      html += '<li style="border:none;padding-top:6px"><span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#ccc">\uD83C\uDF7D Donde comer en la zona</span><ul style="margin:4px 0 0 0;padding-left:16px">';
       day.rests.forEach(function(r){
         var mu = mapsUrl(r.name, r.addr);
-        html += '<li style="font-size:0.85rem;color:#ddd;border:none;padding:3px 0">'+esc(r.name)+(r.notes?' — <span style="color:#aaa">'+esc(r.notes)+'</span>':'')+'<a class="maps-link" href="'+mu+'" target="_blank" rel="noopener" style="margin-left:6px">Maps</a></li>';
+        html += '<li style="font-size:0.85rem;color:#ddd;border:none;padding:3px 0">'+esc(r.name)+(r.notes?' \u2014 <span style="color:#aaa">'+esc(r.notes)+'</span>':'')+'<a class="maps-link" href="'+mu+'" target="_blank" rel="noopener" style="margin-left:6px">Maps</a></li>';
       });
       html += '</ul></li>';
     }
 
     html += '</ul>';
-
     if (routeUrl) {
       html += '<a class="maps-route" href="'+routeUrl+'" target="_blank" rel="noopener">Abrir ruta del dia en Google Maps</a>';
     }
@@ -2413,6 +2443,141 @@ function renderLocalItin(dayPlan, dateVal, pace) {
   });
 
   document.getElementById('itin-output').innerHTML = html || '<div class="empty">No hay suficientes sitios para generar el itinerario.</div>';
+}
+
+function regenerateDay(dayIdx) {
+  if (!currentDayPlan) return;
+  var day = currentDayPlan[dayIdx];
+  if (!day || day.locked) return;
+
+  // Find next free (non-locked) day; wrap to previous if none after
+  var nextIdx = -1;
+  for (var i = dayIdx + 1; i < currentDayPlan.length; i++) {
+    if (!currentDayPlan[i].locked) { nextIdx = i; break; }
+  }
+  if (nextIdx === -1) {
+    for (var i = dayIdx - 1; i >= 0; i--) {
+      if (!currentDayPlan[i].locked) { nextIdx = i; break; }
+    }
+  }
+  if (nextIdx === -1) { toast('No hay otro dia libre para intercambiar'); return; }
+
+  var nextDay = currentDayPlan[nextIdx];
+
+  // Combine and shuffle
+  var combined = day.items.concat(nextDay.items);
+  for (var i = combined.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = combined[i]; combined[i] = combined[j]; combined[j] = tmp;
+  }
+
+  // Redistribute preserving original sizes
+  var size1 = day.items.length;
+  day.items    = combined.slice(0, size1);
+  nextDay.items = combined.slice(size1);
+
+  // Rebuild restByZone
+  var restByZone = {};
+  places.filter(function(p){ return p.cat === 'restaurante'; }).forEach(function(p){
+    if (!restByZone[p.zone]) restByZone[p.zone] = [];
+    restByZone[p.zone].push(p);
+  });
+
+  // Update zone and rests for both days
+  [day, nextDay].forEach(function(d) {
+    var zoneCounts = {};
+    d.items.forEach(function(p){ zoneCounts[p.zone] = (zoneCounts[p.zone]||0) + 1; });
+    var mainZone = 'manhattan', maxC = 0;
+    for (var z in zoneCounts) { if (zoneCounts[z] > maxC) { maxC = zoneCounts[z]; mainZone = z; } }
+    d.zone  = mainZone;
+    d.rests = (restByZone[mainZone] || []).slice(0, 2);
+  });
+
+  renderLocalItin(currentDayPlan, currentDateVal, currentPace);
+  toast('Dia ' + (dayIdx + 1) + ' regenerado \u2014 ruta desde el hotel');
+}
+
+function exportItinerary() {
+  if (!currentDayPlan) { toast('Genera el itinerario primero'); return; }
+  var dayNames = ['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+  var startDate = currentDateVal ? new Date(currentDateVal + 'T12:00:00') : null;
+  var lines = ['\uD83D\uDDFD *NYC TRIP \u2014 Itinerario*', '_28 marzo \u2013 4 abril 2026_', ''];
+
+  currentDayPlan.forEach(function(day, i) {
+    var title = '*D\u00CDA ' + (i+1);
+    if (startDate) {
+      var d = new Date(startDate.getTime() + i * 86400000);
+      title += ' \u2014 ' + dayNames[d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth()+1);
+    }
+    title += '*';
+    lines.push('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500');
+    if (day.locked) {
+      lines.push(title);
+      lines.push('\uD83D\uDD12 ' + (day.lockedTitle || 'Plan privado'));
+      lines.push('');
+      return;
+    }
+
+    var totalMin = (day.items || []).reduce(function(s, p) {
+      return s + (CAT_DURATION[p.cat] || 30);
+    }, 0);
+    var tH = Math.floor(totalMin / 60), tM = totalMin % 60;
+    var timeTxt = '\u23F1 ~' + (tH ? tH + 'h' : '') + (tM ? (tH ? ' ' : '') + tM + 'min' : '');
+    var zoneTxt = '\uD83D\uDDFA Zona: ' + ZL[day.zone];
+    if (day.isRainy) zoneTxt += ' \u2614 Lluvia';
+
+    lines.push(title);
+    lines.push(zoneTxt + '  ' + timeTxt);
+    lines.push('');
+
+    var items = optimizeRoute(day.items);
+    var half = Math.ceil(items.length / 2);
+    lines.push('\u2600\uFE0F *Ma\u00F1ana:*');
+    items.slice(0, half).forEach(function(p) {
+      var dur = CAT_DURATION[p.cat];
+      var durTxt = dur ? ' (~' + (dur >= 60 ? Math.round(dur/60) + 'h' : dur + 'min') + ')' : '';
+      lines.push((CAT_EMOJI[p.cat] || '\uD83D\uDCCD') + ' ' + p.name + durTxt);
+    });
+    if (day.lunch) lines.push('\n\uD83C\uDF7D _Comida: ' + day.lunch.name + '_');
+    lines.push('');
+    lines.push('\uD83C\uDF06 *Tarde:*');
+    items.slice(half).forEach(function(p) {
+      var dur = CAT_DURATION[p.cat];
+      var durTxt = dur ? ' (~' + (dur >= 60 ? Math.round(dur/60) + 'h' : dur + 'min') + ')' : '';
+      lines.push((CAT_EMOJI[p.cat] || '\uD83D\uDCCD') + ' ' + p.name + durTxt);
+    });
+    if (day.dinner) lines.push('\n\uD83C\uDF7D _Cena: ' + day.dinner.name + '_');
+
+    if (day.rests && day.rests.length) {
+      lines.push('_\uD83C\uDF7D Opciones: ' + day.rests.map(function(r){ return r.name; }).join(', ') + '_');
+    }
+
+    var routeUrl = mapsRouteUrl(items);
+    if (routeUrl) lines.push('\n\uD83D\uDCCD Ruta: ' + routeUrl);
+    lines.push('');
+  });
+
+  var text = lines.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      toast('\u2705 Itinerario copiado \u2014 pega en WhatsApp');
+    }).catch(function() {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); toast('\u2705 Copiado al portapapeles'); }
+  catch(e) { toast('No se pudo copiar automaticamente'); }
+  document.body.removeChild(ta);
 }
 
 function generateItinerary() {
