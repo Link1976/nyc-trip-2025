@@ -628,7 +628,7 @@ function callGroq(prompt) {
     return fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
-      body: JSON.stringify({model: 'llama-3.3-70b-versatile', messages: [{role: 'user', content: prompt}], max_tokens: 8000})
+      body: JSON.stringify({model: 'llama-3.3-70b-versatile', messages: [{role: 'user', content: prompt}], max_tokens: 16000})
     });
   })
   .then(function(r){return r.json();})
@@ -2132,7 +2132,6 @@ function processMapsNames() {
 }
 
 function buildLocalItinerary(days, pace, prio, dateVal) {
-  var paceCap = pace === 'relajado' ? 3 : pace === 'normal' ? 5 : 7;
   var allNonVisited = places.filter(function(p){ return visited.indexOf(p.id) === -1; });
   var restByZone = {};
   allNonVisited.filter(function(p){ return p.cat === 'restaurante'; }).forEach(function(p){
@@ -2141,18 +2140,17 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
   });
   var sorted = allNonVisited.filter(function(p){ return p.cat !== 'restaurante'; });
 
-  // Identify locked day indices (0-based)
+  // Locked day indices (0-based)
   var lockedIndices = {};
   if (dateVal) {
     TRIP_DAYS.forEach(function(d, i) {
       if (i < days && lockedDays[d.key]) lockedIndices[i] = lockedDays[d.key].title || 'Plan privado';
     });
-    // Auto-lock arrival (day 0) and departure (last day) to match AI behavior
     if (lockedIndices[0] === undefined) lockedIndices[0] = 'Llegada — noche';
     if (days >= 2 && lockedIndices[days-1] === undefined) lockedIndices[days-1] = 'Salida — antes de las 11h';
   }
 
-  // Identify rainy day indices (0-based)
+  // Rainy day indices
   var rainyIndices = {};
   if (dateVal) {
     TRIP_DAYS.forEach(function(d, i) {
@@ -2160,52 +2158,17 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
     });
   }
 
+  // Sort by priority
   if (prio === 'votos') {
     sorted.sort(function(a,b){ return b.votes - a.votes; });
   } else if (prio === 'ninos') {
-    var kidCats = { museo:3, parque:3, actividad:3, foto:2, cultura:1, compras:1, restaurante:1, transporte:0, otro:0 };
+    var kidCats = { museo:3, parque:3, actividad:3, foto:2, cultura:1, compras:1, transporte:0, otro:0 };
     sorted.sort(function(a,b){
-      var sa = (kidCats[a.cat]||0) + a.votes;
-      var sb = (kidCats[b.cat]||0) + b.votes;
-      return sb - sa;
+      return ((kidCats[b.cat]||0) + b.votes) - ((kidCats[a.cat]||0) + a.votes);
     });
   }
 
-  if (prio === 'zona') {
-    var freeDaysZ = days - Object.keys(lockedIndices).length;
-    var maxPerDay = Math.max(paceCap, freeDaysZ > 0 ? Math.ceil(sorted.length / freeDaysZ) : paceCap);
-    var zoneGroups = {};
-    VZ.forEach(function(z){ zoneGroups[z] = []; });
-    sorted.forEach(function(p){ if(zoneGroups[p.zone]) zoneGroups[p.zone].push(p); });
-    var dayPlan = [];
-    var zIdx = 0; var zKeys = VZ.slice(); var zItemIdx = 0;
-    for (var di = 0; di < days; di++) {
-      if (lockedIndices[di] !== undefined) {
-        dayPlan.push({ locked: true, lockedTitle: lockedIndices[di], items: [] });
-        continue;
-      }
-      var placed = false;
-      while (zIdx < zKeys.length && !placed) {
-        var z = zKeys[zIdx];
-        var items = zoneGroups[z];
-        items.sort(function(a,b){ return b.votes - a.votes; });
-        var batch = items.slice(zItemIdx, zItemIdx + maxPerDay);
-        if (batch.length) {
-          dayPlan.push({ zone: z, items: batch, rests: (restByZone[z]||[]).slice(0,2), isRainy: !!rainyIndices[di] });
-          zItemIdx += maxPerDay;
-          if (zItemIdx >= items.length) { zIdx++; zItemIdx = 0; }
-          placed = true;
-        } else { zIdx++; zItemIdx = 0; }
-      }
-      if (!placed) {
-        if (Object.keys(lockedIndices).some(function(k){ return parseInt(k) > di; })) continue;
-        break;
-      }
-    }
-    return dayPlan;
-  }
-
-  // Count free days split by rainy/normal
+  // Count free days (rainy vs normal)
   var rainyFreeCount = 0, normalFreeCount = 0;
   for (var d = 0; d < days; d++) {
     if (lockedIndices[d] !== undefined) continue;
@@ -2214,16 +2177,56 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
   }
   var totalFreeDays = Math.max(rainyFreeCount + normalFreeCount, 1);
 
-  // Split sites into indoor (safe for rain) and outdoor
+  if (prio === 'zona') {
+    var perDayZ = Math.ceil(sorted.length / totalFreeDays);
+    var zoneGroups = {};
+    VZ.forEach(function(z){ zoneGroups[z] = []; });
+    sorted.forEach(function(p){ if(zoneGroups[p.zone]) zoneGroups[p.zone].push(p); });
+    var dayPlan = [];
+    var zIdx = 0, zKeys = VZ.slice(), zItemIdx = 0;
+    for (var di = 0; di < days; di++) {
+      if (lockedIndices[di] !== undefined) {
+        dayPlan.push({ locked: true, lockedTitle: lockedIndices[di], items: [] });
+        continue;
+      }
+      var placed = false;
+      while (zIdx < zKeys.length && !placed) {
+        var z = zKeys[zIdx];
+        var zItems = zoneGroups[z];
+        var batch = zItems.slice(zItemIdx, zItemIdx + perDayZ);
+        if (batch.length) {
+          dayPlan.push({ zone: z, items: batch, rests: (restByZone[z]||[]).slice(0,2), isRainy: !!rainyIndices[di] });
+          zItemIdx += perDayZ;
+          if (zItemIdx >= zItems.length) { zIdx++; zItemIdx = 0; }
+          placed = true;
+        } else { zIdx++; zItemIdx = 0; }
+      }
+      if (!placed) dayPlan.push({ zone: 'manhattan', items: [], rests: [], isRainy: !!rainyIndices[di] });
+    }
+    return dayPlan;
+  }
+
+  // Build rainy and normal queues based on indoor/outdoor split
   var indoorPool = sorted.filter(function(p){ return !!CAT_INDOOR[p.cat]; });
   var outdoorPool = sorted.filter(function(p){ return !CAT_INDOOR[p.cat]; });
 
-  // Assign indoor sites preferentially to rainy days; overflow + outdoor go to normal days
-  var indoorPerRainy = rainyFreeCount > 0 ? Math.max(3, Math.ceil(indoorPool.length / rainyFreeCount)) : 0;
-  var indoorForRainy = rainyFreeCount > 0 ? indoorPool.slice(0, rainyFreeCount * indoorPerRainy) : [];
-  var indoorOverflow = rainyFreeCount > 0 ? indoorPool.slice(rainyFreeCount * indoorPerRainy) : indoorPool;
-  var normalPool = indoorOverflow.concat(outdoorPool);
-  var normalPerDay = normalFreeCount > 0 ? Math.max(3, Math.ceil(normalPool.length / normalFreeCount)) : 0;
+  // Base items per day evenly distributed
+  var perDay = Math.ceil(sorted.length / totalFreeDays);
+
+  // Rainy days get indoor items first; if not enough indoor, fill with outdoor
+  var rainyTotal = rainyFreeCount * perDay;
+  var rainyQueue = indoorPool.slice(0, rainyTotal);
+  if (rainyQueue.length < rainyTotal) {
+    rainyQueue = rainyQueue.concat(outdoorPool.slice(0, rainyTotal - rainyQueue.length));
+  }
+  // Normal days get everything left
+  var rainyIndoorUsed = Math.min(rainyTotal, indoorPool.length);
+  var rainyOutdoorUsed = Math.max(0, rainyTotal - indoorPool.length);
+  var normalQueue = indoorPool.slice(rainyIndoorUsed).concat(outdoorPool.slice(rainyOutdoorUsed));
+
+  // Evenly distribute within each queue
+  var perRainy  = rainyFreeCount  > 0 ? Math.ceil(rainyQueue.length  / rainyFreeCount)  : 0;
+  var perNormal = normalFreeCount > 0 ? Math.ceil(normalQueue.length / normalFreeCount) : 0;
 
   var dayPlan = [];
   var usedRainy = 0, usedNormal = 0;
@@ -2232,24 +2235,44 @@ function buildLocalItinerary(days, pace, prio, dateVal) {
       dayPlan.push({ locked: true, lockedTitle: lockedIndices[d], items: [] });
       continue;
     }
-    var batch;
-    if (rainyIndices[d]) {
-      batch = indoorForRainy.slice(usedRainy, usedRainy + indoorPerRainy);
-      usedRainy += indoorPerRainy;
-    } else {
-      batch = normalPool.slice(usedNormal, usedNormal + normalPerDay);
-      usedNormal += normalPerDay;
-    }
-    if (!batch.length) {
-      if (Object.keys(lockedIndices).some(function(k){ return parseInt(k) > d; })) continue;
-      break;
-    }
+    var batch = rainyIndices[d]
+      ? rainyQueue.slice(usedRainy,  usedRainy  + perRainy)
+      : normalQueue.slice(usedNormal, usedNormal + perNormal);
+    if (rainyIndices[d]) usedRainy  += perRainy;
+    else                  usedNormal += perNormal;
     var zoneCounts = {};
     batch.forEach(function(p){ zoneCounts[p.zone] = (zoneCounts[p.zone]||0) + 1; });
     var mainZone = 'manhattan', maxC = 0;
     for (var z in zoneCounts) { if (zoneCounts[z] > maxC) { maxC = zoneCounts[z]; mainZone = z; } }
     dayPlan.push({ zone: mainZone, items: batch, rests: (restByZone[mainZone]||[]).slice(0,2), isRainy: !!rainyIndices[d] });
   }
+  return dayPlan;
+}
+
+// Guarantee: after any path (AI or local), add back any non-restaurant non-visited sites
+// that ended up missing from the plan (AI time-limit cuts, name-match failures, etc.)
+function reconcileMissingSites(dayPlan) {
+  var allTarget = places.filter(function(p) {
+    return p.cat !== 'restaurante' && visited.indexOf(p.id) === -1;
+  });
+  var assignedIds = {};
+  dayPlan.forEach(function(day) {
+    if (day.locked) return;
+    (day.items || []).forEach(function(p) { assignedIds[p.id] = true; });
+  });
+  var missing = allTarget.filter(function(p) { return !assignedIds[p.id]; });
+  if (!missing.length) return dayPlan;
+  var freeDays = dayPlan.filter(function(day) { return !day.locked && day.items; });
+  if (!freeDays.length) return dayPlan;
+  missing.forEach(function(p) {
+    // Add to the free day with fewest items; prefer matching zone
+    var best = freeDays.reduce(function(a, b) {
+      var sa = a.items.length - (a.zone === p.zone ? 10 : 0);
+      var sb = b.items.length - (b.zone === p.zone ? 10 : 0);
+      return sa <= sb ? a : b;
+    });
+    best.items.push(p);
+  });
   return dayPlan;
 }
 
@@ -2466,7 +2489,7 @@ function generateItinerary() {
     '\nDURACIONES por categoria: museo=1h, actividad=1.5h, parque=1h, foto=20min, cultura=45min, compras=45min, mercado=45min\n'+
     '\nREGLAS:\n'+
     '1. Maximo '+(maxMinPerDay/60)+'h por dia (ritmo '+pace+'). Distribuye uniformemente.\n'+
-    '2. Incluye todos los sitios posibles respetando el maximo de horas.\n'+
+    '2. Incluye TODOS los sitios de la lista sin excepcion. Si un dia se llena, mueve el excedente al dia siguiente.\n'+
     '3. Tiendas solo en tarde. Turismo en manana y tarde.\n'+
     '4. Agrupa por zona geografica para minimizar desplazamientos.\n'+
     '5. lunch y dinner: elige de la lista de restaurantes segun la zona del dia.\n'+
@@ -2499,13 +2522,13 @@ function generateItinerary() {
         next.sites.unshift(d.sites.pop());
       }
     }
-    var dayPlan = buildDayPlanFromAI(aiDays);
+    var dayPlan = reconcileMissingSites(buildDayPlanFromAI(aiDays));
     renderLocalItin(dayPlan, dateVal, pace);
     toast('Itinerario generado con IA');
   })
   .catch(function(err){
     console.error('IA error:', err);
-    var dayPlan = buildLocalItinerary(days, pace, prio, dateVal);
+    var dayPlan = reconcileMissingSites(buildLocalItinerary(days, pace, prio, dateVal));
     if (dayPlan.length > 0) {
       renderLocalItin(dayPlan, dateVal, pace);
       toast('Modo local — Error IA: ' + (err.message || err));
